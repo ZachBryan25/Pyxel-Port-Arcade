@@ -91,8 +91,6 @@ what will be your communication like (will you use Slack, Canvas or something si
 communicate? How often will you meet in person?), etc
 Zidan Waite - zgw21 - AI scripting
 
-Yo, its Zidan. Right now I’m just working on getting animations down through pyxel
 
-I’ve only got a stick figure going right now, but I’ve got the borders down, jump, punch, walking animation, and direction facing right now
 
 
