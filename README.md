@@ -122,7 +122,7 @@ We want to develop this project to explore how artificial intelligence can enhan
 
 ---
 
-## Team Role Distribution (7 Members)
+## Team Role Distribution 
 - Game loop & engine integration  
 - Player mechanics  
 - Enemy mechanics  
