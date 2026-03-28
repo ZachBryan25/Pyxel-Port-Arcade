@@ -128,7 +128,7 @@ We want to develop this project to explore how artificial intelligence can enhan
 - Enemy mechanics  
 - Adaptive AI system & difficulty scaling  
 - UI / UX (menus, HUD, screens)  
-- Level design & asset pipeline  
+- Level design & asset pipeline (Zidan Waite)
 - Testing, bug fixing, and release management  
 
 ---
