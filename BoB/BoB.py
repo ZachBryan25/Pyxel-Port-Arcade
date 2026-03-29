@@ -14,6 +14,20 @@ class App:
         self.diff_items = ["EASY", "MEDIUM", "HARD"]
         self.diff_selected = 0
 
+        # PLAYER
+        self.px = 150
+        self.py = 150
+        self.vy = 0
+
+        self.on_ground = False
+        self.crouching = False
+
+        self.speed = 2
+        self.jump_power = -5
+        self.gravity = 0.3
+
+        self.ground_y = 175
+
         pyxel.run(self.update, self.draw)
 
     # ───────── UPDATE ─────────
@@ -41,6 +55,33 @@ class App:
             if pyxel.btnp(pyxel.KEY_ESCAPE):
                 self.state = "menu"
 
+            # LEFT / RIGHT
+            if pyxel.btn(pyxel.KEY_LEFT):
+                self.px -= self.speed
+            if pyxel.btn(pyxel.KEY_RIGHT):
+                self.px += self.speed
+
+            # SCREEN BOUNDS
+            self.px = max(5, min(W - 5, self.px))
+
+            # CROUCH
+            self.crouching = pyxel.btn(pyxel.KEY_DOWN)
+
+            # JUMP
+            if pyxel.btnp(pyxel.KEY_UP) and self.on_ground:
+                self.vy = self.jump_power
+                self.on_ground = False
+
+            # GRAVITY
+            self.vy += self.gravity
+            self.py += self.vy
+
+            # GROUND COLLISION
+            if self.py >= self.ground_y:
+                self.py = self.ground_y
+                self.vy = 0
+                self.on_ground = True
+
     def select_menu(self):
         choice = self.menu_items[self.selected]
         if choice == "START GAME":
@@ -66,23 +107,19 @@ class App:
             col = 1 if y < H//2 else 0
             pyxel.line(0, y, W, y, col)
 
-        # 🔥 TITLE
         title = "BRAINS OVER BYTES"
         scale = 3
-
         total_w = len(title) * (3 * scale + scale)
         start_x = (W - total_w) // 2
         y = 30
 
         self.draw_block_text(start_x, y, title, scale, 8)
 
-        # 🎯 CENTERED INSERT COIN
         if pyxel.frame_count % 40 < 20:
             text = "INSERT COIN"
             text_w = len(text) * 4
             pyxel.text((W - text_w)//2, 80, text, 11)
 
-        # menu box
         pyxel.rect(90, 110, 140, 90, 0)
         pyxel.rectb(90, 110, 140, 90, 8)
 
@@ -176,6 +213,8 @@ class App:
 
         pyxel.line(160, 240, 160, 140, 7)
 
+        
+
         # diner
         diner_x = 20
         diner_y = 90
@@ -209,12 +248,7 @@ class App:
         pyxel.rect(sign_x, sign_y, sign_w, sign_h, 2)
         pyxel.rectb(sign_x, sign_y, sign_w, sign_h, 14)
 
-        text = "DINER"
-        text_w = len(text) * 4
-        text_x = sign_x + (sign_w - text_w) // 2
-        text_y = sign_y + (sign_h - 6) // 2
-
-        pyxel.text(text_x, text_y, text, 7)
+        pyxel.text(sign_x + 19, sign_y + 7, "DINER", 7)
 
         # car
         self.draw_car(190, 150)
@@ -227,17 +261,49 @@ class App:
 
         pyxel.text(5, 5, f"DIFF: {settings.difficulty}", 7)
 
+        # PLAYER
+        self.draw_player()
+
     # 🚗 CAR
     def draw_car(self, x, y):
         pyxel.rect(x, y, 40, 10, 2)
         pyxel.rect(x+10, y-8, 20, 8, 2)
-        pyxel.rect(x+12, y-6, 6, 4, 7)
+        pyxel.rect(x+21, y-6, 6, 4, 7)
         pyxel.circ(x+8, y+10, 3, 0)
         pyxel.circ(x+30, y+10, 3, 0)
         pyxel.rect(x+40, y+2, 4, 3, 7)
 
-        for i in range(20):
-            pyxel.line(x+44, y+3, x+60+i, y-5+i//2, 10)
+       
+        base_y = y + 10  # same as bottom of wheels
+        start_x = x + 44
+        height = 8
+
+        for i in range(height):
+            pyxel.line(
+        start_x, base_y - i,
+        start_x + i * 2, base_y,
+        10
+    )
+
+    # 🧍 PLAYER
+    def draw_player(self):
+        x = self.px
+        y = self.py
+
+        if self.crouching:
+            pyxel.rect(x-2, y-10, 6, 4, 7)
+            pyxel.rect(x-3, y-6, 8, 4, 7)
+            pyxel.line(x-3, y-2, x-6, y+4, 7)
+            pyxel.line(x+5, y-2, x+8, y+4, 7)
+            pyxel.line(x-4, y-6, x-8, y-2, 7)
+            pyxel.line(x+4, y-6, x+8, y-2, 7)
+        else:
+            pyxel.circ(x, y-12, 3, 7)
+            pyxel.line(x, y-9, x, y-2, 7)
+            pyxel.line(x, y-7, x-5, y-4, 7)
+            pyxel.line(x, y-7, x+5, y-4, 7)
+            pyxel.line(x, y-2, x-4, y+4, 7)
+            pyxel.line(x, y-2, x+4, y+4, 7)
 
     def glow_text(self, x, y, txt, col):
         pyxel.text(x-1, y, txt, col)
