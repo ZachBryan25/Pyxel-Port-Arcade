@@ -10,15 +10,13 @@ class App:
 
         self.state = "menu"
 
-        # 🎮 GAME LIST
+        # 🎮 GAME LIST (5 games)
         self.games = [
-            "ZACH",
-            "MARCUS",
-            "ZEE",
-            "DONWON",
-            "LEO",
-            "DERRICK",
-            "WIDENS"
+            "Game 1",
+            "Game 2",
+            "Game 3",
+            "Game 4",
+            "Game 5"
         ]
         self.selected = 0
 
@@ -35,7 +33,7 @@ class App:
 
             if pyxel.btnp(pyxel.KEY_RETURN):
                 game_name = self.games[self.selected]
-                self.state = f"game_{game_name}"
+                self.state = f"game_{self.selected+1}"  # Use index for easier routing
 
         elif self.state.startswith("game_"):
             # TAB → return to menu
@@ -54,7 +52,7 @@ class App:
             self.draw_menu()
 
         elif self.state.startswith("game_"):
-            self.draw_game_placeholder()
+            self.draw_game_screen()
 
     # 🎮 MAIN ARCADE MENU
     def draw_menu(self):
@@ -83,13 +81,13 @@ class App:
             text = "INSERT COIN"
             pyxel.text((W - len(text) * 4) // 2, 70, text, 10)
 
-        # MENU BOX
+        # MENU BOX (shifted down 2 pixels)
         pyxel.rect(80, 102, 160, 110, 0)
         pyxel.rectb(80, 102, 160, 110, 7)
 
         # GAME LIST
         for i, game in enumerate(self.games):
-            y = 120 + i * 14
+            y = 122 + i * 14  # slightly down inside box
 
             # 🪙 QUARTER CURSOR
             if i == self.selected:
@@ -98,10 +96,11 @@ class App:
             pyxel.text(110, y, game, 7)
 
     # 🕹️ PLACEHOLDER GAME SCREEN
-    def draw_game_placeholder(self):
+    def draw_game_screen(self):
         pyxel.cls(0)
 
-        game_name = self.state.replace("game_", "")
+        game_index = int(self.state.split("_")[1])
+        game_name = f"Game {game_index}"
 
         msg = f"INSERT {game_name} HERE"
         pyxel.text((W - len(msg) * 4) // 2, H // 2, msg, 7)
@@ -143,5 +142,5 @@ class App:
                         )
 
 
-# RUN GAME
+# RUN THE APP
 App()
