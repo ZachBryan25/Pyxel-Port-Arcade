@@ -7,9 +7,241 @@ import time
 W, H = 320, 240
 
 
+# ───────── RANDOM ACCESS MATCH GAME ─────────
+class RandomAccessMatch:
+    def __init__(self):
+        self.px = 150
+        self.py = 150
+        self.speed = 2
+
+        self.card_w = 40
+        self.card_h = 40
+        self.grid_rows = 4
+        self.grid_cols = 4
+
+        self.cards = []
+        self.flipped = []
+        self.revealed = []
+
+        self.can_move = True
+        self.flip_timer = None
+
+        self.turns = 0
+        self.mistakes = 0
+
+        self.preview_time = None
+        self.preview_duration = 2
+
+        self.shapes = [
+            ("heart", 14),
+            ("square", 11),
+            ("circle", 12),
+            ("rectangle", 9),
+            ("diamond", 6),
+            ("oval", 15),
+            ("trapezoid", 8),
+            ("hexagon", 10)
+        ]
+
+        self.prepare_cards()
+
+    def start(self):
+        self.flipped = []
+        self.revealed = []
+        self.can_move = True
+        self.flip_timer = None
+
+        self.turns = 0
+        self.mistakes = 0
+
+        self.px = W // 2
+        self.py = H // 2
+
+        for card in self.cards:
+            card["flipped"] = False
+            card["flip_progress"] = 1
+
+        self.preview_time = time.time()
+
+    def prepare_cards(self):
+        card_shapes = self.shapes * 2
+        random.shuffle(card_shapes)
+
+        self.cards = []
+        for i in range(self.grid_rows):
+            for j in range(self.grid_cols):
+                x = 60 + j * (self.card_w + 5)
+                y = 50 + i * (self.card_h + 5)
+                shape, col = card_shapes.pop()
+
+                self.cards.append({
+                    "x": x,
+                    "y": y,
+                    "shape": shape,
+                    "color": col,
+                    "flipped": False,
+                    "flip_progress": 1
+                })
+
+    def update(self):
+        # PREVIEW MODE
+        if self.preview_time:
+            if time.time() - self.preview_time < self.preview_duration:
+                for card in self.cards:
+                    card["flipped"] = True
+                return
+            else:
+                for card in self.cards:
+                    card["flipped"] = False
+                self.preview_time = None
+
+        # MOVEMENT
+        if self.can_move:
+            if pyxel.btn(pyxel.KEY_LEFT):
+                self.px -= self.speed
+            if pyxel.btn(pyxel.KEY_RIGHT):
+                self.px += self.speed
+            if pyxel.btn(pyxel.KEY_UP):
+                self.py -= self.speed
+            if pyxel.btn(pyxel.KEY_DOWN):
+                self.py += self.speed
+
+        self.px = max(5, min(W - 5, self.px))
+        self.py = max(5, min(H - 5, self.py))
+
+        # FLIP CARD
+        if pyxel.btnp(pyxel.KEY_SPACE):
+            for card in self.cards:
+                if self.is_on_card(card) and card not in self.flipped + self.revealed:
+                    card["flipped"] = True
+                    card["flip_progress"] = 0
+                    self.flipped.append(card)
+
+                    if len(self.flipped) == 2:
+                        self.check_match()
+
+        # LOCK MOVEMENT
+        if len(self.flipped) == 2:
+            self.can_move = False
+
+        # FLIP BACK TIMER
+        if self.flip_timer:
+            if time.time() - self.flip_timer > 0.5:
+                for card in self.flipped:
+                    card["flipped"] = False
+                self.flipped = []
+                self.flip_timer = None
+                self.can_move = True
+
+        # ANIMATION
+        for card in self.cards:
+            if card["flipped"] and card["flip_progress"] < 1:
+                card["flip_progress"] += 0.2
+
+    def is_on_card(self, card):
+        return (
+            self.px >= card["x"] and self.px <= card["x"] + self.card_w and
+            self.py >= card["y"] and self.py <= card["y"] + self.card_h
+        )
+
+    def check_match(self):
+        a, b = self.flipped
+        self.turns += 1
+
+        if a["shape"] == b["shape"]:
+            self.revealed += [a, b]
+            self.flipped = []
+            pyxel.play(0, 0)
+            self.can_move = True
+        else:
+            self.mistakes += 1
+            self.flip_timer = time.time()
+            pyxel.play(0, 1)
+
+    def draw(self):
+        pyxel.cls(0)
+
+        hovered = None
+        for card in self.cards:
+            if self.is_on_card(card):
+                hovered = card
+
+        for card in self.cards:
+            if card == hovered:
+                pyxel.rectb(card["x"] - 1, card["y"] - 1, self.card_w + 2, self.card_h + 2, 10)
+
+            if card["flipped"] or card in self.revealed:
+                scale = card["flip_progress"]
+                w = int(self.card_w * scale)
+                px = card["x"] + (self.card_w - w) // 2
+
+                pyxel.rect(px, card["y"], w, self.card_h, 7)
+
+                if scale > 0.5:
+                    self.draw_shape(card)
+            else:
+                self.draw_ram(card)
+
+        self.draw_player()
+
+        pyxel.text(5, 5, f"Turns: {self.turns}", 7)
+        pyxel.text(5, 15, f"Mistakes: {self.mistakes}", 8)
+
+        if len(self.revealed) == 16:
+            pyxel.rect(60, 80, 200, 80, 0)
+            pyxel.rectb(60, 80, 200, 80, 7)
+
+            pyxel.text(110, 95, "YOU WIN!", 11)
+            pyxel.text(90, 110, f"Turns: {self.turns}", 7)
+            pyxel.text(90, 120, f"Mistakes: {self.mistakes}", 8)
+
+        pyxel.text(5, H - 10, "ARROWS move  SPACE flip  TAB menu", 5)
+
+    def draw_player(self):
+        pyxel.rect(self.px - 3, self.py - 6, 6, 6, 4)
+
+    def draw_shape(self, card):
+        cx = card["x"] + self.card_w // 2
+        cy = card["y"] + self.card_h // 2
+        col = card["color"]
+        shape = card["shape"]
+
+        if shape == "circle":
+            pyxel.circ(cx, cy, 5, col)
+        elif shape == "square":
+            pyxel.rect(cx - 5, cy - 5, 10, 10, col)
+        elif shape == "heart":
+            pyxel.tri(cx, cy - 6, cx - 6, cy + 4, cx + 6, cy + 4, col)
+        elif shape == "rectangle":
+            pyxel.rect(cx - 8, cy - 3, 16, 6, col)
+        elif shape == "trapezoid":
+            pyxel.tri(cx - 6, cy + 5, cx - 4, cy - 5, cx + 4, cy - 5, col)
+            pyxel.tri(cx - 6, cy + 5, cx + 6, cy + 5, cx + 4, cy - 5, col)
+        elif shape == "diamond":
+            pyxel.tri(cx, cy - 6, cx - 6, cy, cx + 6, cy, col)
+            pyxel.tri(cx, cy + 6, cx - 6, cy, cx + 6, cy, col)
+        elif shape == "oval":
+            pyxel.rect(cx - 2, cy - 6, 4, 12, col)
+            pyxel.rect(cx - 6, cy - 2, 12, 4, col)
+        elif shape == "hexagon":
+            pyxel.rect(cx - 1, cy - 6, 2, 12, col)
+            pyxel.rect(cx - 6, cy - 1, 12, 2, col)
+            pyxel.rect(cx - 4, cy - 4, 8, 8, col)
+
+    def draw_ram(self, card):
+        pyxel.rect(card["x"], card["y"], self.card_w, self.card_h, 2)
+        text = "R.A.M."
+        tx = card["x"] + (self.card_w - len(text) * 4) // 2
+        ty = card["y"] + self.card_h // 2 - 2
+        pyxel.text(tx, ty, text, 1)
+
+
 class App:
     def __init__(self):
         pyxel.init(W, H, title="Pyxel Port", fps=60)
+
+        pyxel.sound(0).set("c3e3g3", "p", "7", "s", 5)
+        pyxel.sound(1).set("c2", "p", "6", "s", 10)
 
         self.state = "menu"
 
@@ -26,8 +258,7 @@ class App:
         self.max_waves = 5
         self.reset_game1()
         self.reset_game2()
-        self.init_game3()
-        self.start_game3()
+        self.ram_game = RandomAccessMatch()
         self.reset_game4()
 
         pyxel.run(self.update, self.draw)
@@ -71,65 +302,6 @@ class App:
         self.enemy_score = 0
         self.game2_over = False
         self.game2_winner = ""
-
-    # ───────── INIT / START GAME 3 (RANDOM ACCESS MATCH) ─────────
-    def init_game3(self):
-        self.g3_speed = 2
-        self.g3_card_w = 40
-        self.g3_card_h = 40
-        self.g3_grid_rows = 4
-        self.g3_grid_cols = 4
-        self.g3_cards = []
-        self.g3_flipped = []
-        self.g3_revealed = []
-        self.g3_flip_timer = None
-        self.g3_congrats_start = None
-        self.g3_congrats_flash_count = 0
-        self.g3_congrats_show = False
-
-        self.g3_shapes = [
-            ("heart", 14),
-            ("square", 11),
-            ("circle", 12),
-            ("rectangle", 9),
-            ("diamond", 6),
-            ("oval", 15),
-            ("trapezoid", 8),
-            ("hexagon", 10)
-        ]
-
-        self.prepare_game3_cards()
-
-    def start_game3(self):
-        self.g3_flipped = []
-        self.g3_revealed = []
-        self.g3_flip_timer = None
-        self.g3_congrats_start = None
-        self.g3_congrats_flash_count = 0
-        self.g3_congrats_show = False
-        self.g3_px = W // 2
-        self.g3_py = H // 2
-
-        for card in self.g3_cards:
-            card["flipped"] = False
-
-    def prepare_game3_cards(self):
-        card_shapes = self.g3_shapes * 2
-        random.shuffle(card_shapes)
-        self.g3_cards = []
-
-        for i in range(self.g3_grid_rows):
-            for j in range(self.g3_grid_cols):
-                x = 60 + j * (self.g3_card_w + 5)
-                y = 50 + i * (self.g3_card_h + 5)
-                shape, col = card_shapes.pop()
-                self.g3_cards.append({
-                    "x": x,
-                    "y": y,
-                    "shape": shape,
-                    "color": col,
-                    "flipped": False
-                })
 
     # ───────── RESET GAME 4 (SPACE INVADERS) ─────────
     def reset_game4(self):
@@ -188,8 +360,8 @@ class App:
                 elif self.state == "game_2":
                     self.reset_game2()
                 elif self.state == "game_3":
-                    self.prepare_game3_cards()
-                    self.start_game3()
+                    self.ram_game.prepare_cards()
+                    self.ram_game.start()
                 elif self.state == "game_4":
                     self.reset_game4()
 
@@ -225,7 +397,7 @@ class App:
                 self.state = "menu"
 
         elif self.state == "game_3":
-            self.update_game3()
+            self.ram_game.update()
             if pyxel.btnp(pyxel.KEY_TAB):
                 self.state = "menu"
 
@@ -567,63 +739,6 @@ class App:
             self.game2_winner = "YOU LOSE!"
             self.state = "game_2_over"
 
-    # ───────── GAME 3 UPDATE (RANDOM ACCESS MATCH) ─────────
-    def update_game3(self):
-        if pyxel.btn(pyxel.KEY_LEFT):
-            self.g3_px -= self.g3_speed
-        if pyxel.btn(pyxel.KEY_RIGHT):
-            self.g3_px += self.g3_speed
-        if pyxel.btn(pyxel.KEY_UP):
-            self.g3_py -= self.g3_speed
-        if pyxel.btn(pyxel.KEY_DOWN):
-            self.g3_py += self.g3_speed
-
-        self.g3_px = max(5, min(W - 5, self.g3_px))
-        self.g3_py = max(5, min(H - 5, self.g3_py))
-
-        if pyxel.btnp(pyxel.KEY_SPACE):
-            for card in self.g3_cards:
-                if self.is_on_game3_card(card) and card not in self.g3_flipped + self.g3_revealed:
-                    card["flipped"] = True
-                    self.g3_flipped.append(card)
-                    if len(self.g3_flipped) == 2:
-                        self.check_game3_match()
-                    break
-
-        if self.g3_flip_timer:
-            if time.time() - self.g3_flip_timer > 0.5:
-                for card in self.g3_flipped:
-                    card["flipped"] = False
-                self.g3_flipped = []
-                self.g3_flip_timer = None
-
-        if len(self.g3_revealed) == 16 and not self.g3_congrats_start:
-            self.g3_congrats_start = time.time()
-            self.g3_congrats_flash_count = 0
-            self.g3_congrats_show = True
-
-        if self.g3_congrats_start and self.g3_congrats_flash_count < 6:
-            if time.time() - self.g3_congrats_start > 0.5:
-                self.g3_congrats_show = not self.g3_congrats_show
-                self.g3_congrats_start = time.time()
-                self.g3_congrats_flash_count += 1
-        elif self.g3_congrats_flash_count >= 6:
-            self.g3_congrats_show = True
-
-    def is_on_game3_card(self, card):
-        return (
-            self.g3_px >= card["x"] and self.g3_px <= card["x"] + self.g3_card_w and
-            self.g3_py >= card["y"] and self.g3_py <= card["y"] + self.g3_card_h
-        )
-
-    def check_game3_match(self):
-        a, b = self.g3_flipped
-        if a["shape"] == b["shape"]:
-            self.g3_revealed += [a, b]
-            self.g3_flipped = []
-        else:
-            self.g3_flip_timer = time.time()
-
     # ───────── GAME 4 UPDATE (SPACE INVADERS) ─────────
     def update_game4(self):
         if pyxel.btn(pyxel.KEY_LEFT):
@@ -750,7 +865,7 @@ class App:
         elif self.state == "game_2_over":
             self.draw_game2_over()
         elif self.state == "game_3":
-            self.draw_game3()
+            self.ram_game.draw()
         elif self.state == "game_4":
             self.draw_game4()
         elif self.state == "game_4_over":
@@ -890,66 +1005,6 @@ class App:
 
         menu_text = "TAB FOR MENU"
         pyxel.text((W - len(menu_text) * 4) // 2, 152, menu_text, 6)
-
-    # ───────── GAME 3 DRAW ─────────
-    def draw_game3(self):
-        pyxel.cls(0)
-
-        for card in self.g3_cards:
-            if card["flipped"] or card in self.g3_revealed:
-                pyxel.rect(card["x"], card["y"], self.g3_card_w, self.g3_card_h, 7)
-                self.draw_game3_shape(card)
-            else:
-                self.draw_game3_ram(card)
-
-        self.draw_game3_player()
-
-        pyxel.text(5, H - 10, "ARROWS move  SPACE flip  TAB menu", 5)
-
-        if self.g3_congrats_show:
-            msg = "CONGRATS!!"
-            pyxel.text((W - len(msg) * 4) // 2, 20, msg, 3)
-
-    def draw_game3_player(self):
-        pyxel.rect(self.g3_px - 3, self.g3_py - 6, 6, 6, 4)
-
-    def draw_game3_shape(self, card):
-        cx = card["x"] + self.g3_card_w // 2
-        cy = card["y"] + self.g3_card_h // 2
-        col = card["color"]
-        shape = card["shape"]
-
-        if shape == "circle":
-            pyxel.circ(cx, cy, 5, col)
-        elif shape == "square":
-            pyxel.rect(cx - 5, cy - 5, 10, 10, col)
-        elif shape == "heart":
-            pyxel.tri(cx, cy - 6, cx - 6, cy + 4, cx + 6, cy + 4, col)
-        elif shape == "rectangle":
-            pyxel.rect(cx - 8, cy - 3, 16, 6, col)
-        elif shape == "trapezoid":
-            pyxel.tri(cx - 6, cy + 5, cx - 4, cy - 5, cx + 4, cy - 5, col)
-            pyxel.tri(cx - 6, cy + 5, cx + 6, cy + 5, cx + 4, cy - 5, col)
-        elif shape == "diamond":
-            pyxel.tri(cx, cy - 6, cx - 6, cy, cx + 6, cy, col)
-            pyxel.tri(cx, cy + 6, cx - 6, cy, cx + 6, cy, col)
-        elif shape == "oval":
-            pyxel.rect(cx - 2, cy - 6, 4, 12, col)
-            pyxel.rect(cx - 6, cy - 2, 12, 4, col)
-        elif shape == "hexagon":
-            pyxel.rect(cx - 1, cy - 6, 2, 12, col)
-            pyxel.rect(cx - 6, cy - 1, 12, 2, col)
-            pyxel.rect(cx - 4, cy - 4, 8, 8, col)
-
-    def draw_game3_ram(self, card):
-        pyxel.rect(card["x"], card["y"], self.g3_card_w, self.g3_card_h, 2)
-
-        text = "R.A.M."
-        text_width = len(text) * 4
-        tx = card["x"] + (self.g3_card_w - text_width) // 2
-        ty = card["y"] + self.g3_card_h // 2 - 2
-
-        pyxel.text(tx, ty, text, 1)
 
     # ───────── GAME 4 DRAW ─────────
     def draw_game4(self):
@@ -1180,3 +1235,4 @@ class App:
 
 
 App()
+
