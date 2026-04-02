@@ -1,4 +1,15 @@
-# StreetCrashers
+# Pyxel Port Arcade
+
+
+Increment 2 Overview
+
+Firstly. Please run Pyxel port file for the full capabilities of increment 2
+
+Increment 2 focuses on transitioning the project from initial planning into a functional, interactive arcade system. At this stage, the application successfully initializes a Pyxel window and implements a structured game loop using update and draw functions.
+
+The project now includes a working main menu that allows users to navigate between multiple mini-games. Several games, including Dungeon Shooter, Pong, and Space Invaders, are integrated into the system and can be launched from the menu interface. Each game contains its own core mechanics and reset logic, demonstrating modular design and separation of functionality.
+
+This increment emphasizes system integration, user interaction, and playability. The codebase has been organized to support scalability, allowing additional games and features to be added in future increments. Overall, Increment 2 represents a fully runnable prototype where users can interact with multiple game experiences within a single arcade framework.
 
 
 Project idea
