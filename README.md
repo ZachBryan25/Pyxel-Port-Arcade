@@ -101,7 +101,3 @@ have a manager in charge of delegating tasks or will you decide together based o
 what will be your communication like (will you use Slack, Canvas or something similar to
 communicate? How often will you meet in person?), etc
 Zidan Waite - zgw21 - AI scripting
-
-
-
-

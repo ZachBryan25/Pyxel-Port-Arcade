@@ -1,0 +1,641 @@
+import pyxel
+import random
+import math
+
+# SCREEN SIZE
+W, H = 320, 240
+
+
+class App:
+    def __init__(self):
+        pyxel.init(W, H, title="Pyxel Port", fps=60)
+
+        self.state = "menu"
+
+        self.games = [
+            "Dungeon Shooter",
+            "Game 2",
+            "Game 3",
+            "Game 4",
+            "Game 5"
+        ]
+
+        self.selected = 0
+
+        self.max_waves = 5
+        self.reset_game1()
+
+        pyxel.run(self.update, self.draw)
+
+    # ───────── RESET GAME 1 ─────────
+    def reset_game1(self):
+        self.player_x = 230
+        self.player_y = 125
+        self.player_speed = 2
+        self.player_w = 12
+        self.player_h = 12
+        self.player_dir = "right"
+
+        self.bullets = []
+        self.enemies = []
+        self.particles = []
+
+        self.score = 0
+        self.max_hearts = 4
+        self.hearts = 4
+
+        self.invincible_timer = 0
+        self.shoot_cooldown = 0
+
+        self.wave = 1
+        self.wave_banner_timer = 90
+        self.wave_cleared_timer = 0
+        self.wave_spawned = False
+
+        self.spawn_wave(self.wave)
+
+    # ───────── UPDATE ─────────
+    def update(self):
+        if pyxel.btnp(pyxel.KEY_ESCAPE):
+            pyxel.quit()
+
+        if self.state == "menu":
+            if pyxel.btnp(pyxel.KEY_DOWN):
+                self.selected = (self.selected + 1) % len(self.games)
+
+            if pyxel.btnp(pyxel.KEY_UP):
+                self.selected = (self.selected - 1) % len(self.games)
+
+            if pyxel.btnp(pyxel.KEY_RETURN):
+                self.state = f"game_{self.selected + 1}"
+                if self.state == "game_1":
+                    self.reset_game1()
+
+        elif self.state == "game_1":
+            self.update_game1()
+
+            if pyxel.btnp(pyxel.KEY_TAB):
+                self.state = "menu"
+
+        elif self.state == "game_1_over":
+            if pyxel.btnp(pyxel.KEY_RETURN):
+                self.reset_game1()
+                self.state = "game_1"
+
+            if pyxel.btnp(pyxel.KEY_TAB):
+                self.state = "menu"
+
+        elif self.state == "game_1_win":
+            if pyxel.btnp(pyxel.KEY_RETURN):
+                self.reset_game1()
+                self.state = "game_1"
+
+            if pyxel.btnp(pyxel.KEY_TAB):
+                self.state = "menu"
+
+        elif self.state.startswith("game_"):
+            if pyxel.btnp(pyxel.KEY_TAB):
+                self.state = "menu"
+
+    # ───────── GAME 1 UPDATE ─────────
+    def update_game1(self):
+        if self.wave_banner_timer > 0:
+            self.wave_banner_timer -= 1
+
+        if self.wave_cleared_timer > 0:
+            self.wave_cleared_timer -= 1
+            self.update_particles()
+
+            if self.wave_cleared_timer == 0:
+                self.wave += 1
+                if self.wave > self.max_waves:
+                    self.state = "game_1_win"
+                    return
+                self.spawn_wave(self.wave)
+                self.wave_banner_timer = 90
+            return
+
+        dx = 0
+        dy = 0
+
+        if pyxel.btn(pyxel.KEY_A) or pyxel.btn(pyxel.KEY_LEFT):
+            dx = -self.player_speed
+            self.player_dir = "left"
+        if pyxel.btn(pyxel.KEY_D) or pyxel.btn(pyxel.KEY_RIGHT):
+            dx = self.player_speed
+            self.player_dir = "right"
+        if pyxel.btn(pyxel.KEY_W) or pyxel.btn(pyxel.KEY_UP):
+            dy = -self.player_speed
+            self.player_dir = "up"
+        if pyxel.btn(pyxel.KEY_S) or pyxel.btn(pyxel.KEY_DOWN):
+            dy = self.player_speed
+            self.player_dir = "down"
+
+        self.player_x += dx
+        self.player_y += dy
+
+        # keep player inside room
+        self.player_x = max(20, min(self.player_x, W - 32))
+        self.player_y = max(28, min(self.player_y, H - 28))
+
+        # shooting
+        if self.shoot_cooldown > 0:
+            self.shoot_cooldown -= 1
+
+        if pyxel.btn(pyxel.KEY_SPACE) and self.shoot_cooldown == 0:
+            self.spawn_bullet()
+            self.shoot_cooldown = 10
+
+        if self.invincible_timer > 0:
+            self.invincible_timer -= 1
+
+        self.update_bullets()
+        self.update_enemies()
+        self.update_particles()
+        self.check_bullet_enemy_collisions()
+        self.check_enemy_player_collisions()
+        self.cleanup_enemies()
+
+        if self.hearts <= 0:
+            self.state = "game_1_over"
+            return
+
+        if len(self.enemies) == 0 and self.wave_cleared_timer == 0:
+            self.wave_cleared_timer = 70
+
+    def spawn_wave(self, wave_num):
+        self.enemies = []
+        enemy_count = 2 + wave_num * 2
+
+        for _ in range(enemy_count):
+            ex, ey = self.random_edge_spawn()
+            speed = min(0.45 + wave_num * 0.12 + random.uniform(-0.05, 0.08), 1.3)
+
+            enemy_type = "normal"
+            color_hint = 7
+
+            if wave_num >= 3 and random.random() < 0.25:
+                enemy_type = "fast"
+                speed += 0.35
+                color_hint = 10
+
+            self.enemies.append({
+                "x": ex,
+                "y": ey,
+                "alive": True,
+                "speed": speed,
+                "type": enemy_type,
+                "color_hint": color_hint
+            })
+
+    def random_edge_spawn(self):
+        side = random.randint(0, 3)
+
+        if side == 0:      # top
+            return random.randint(40, W - 40), 35
+        elif side == 1:    # bottom
+            return random.randint(40, W - 40), H - 45
+        elif side == 2:    # left
+            return 40, random.randint(40, H - 40)
+        else:              # right
+            return W - 45, random.randint(40, H - 40)
+
+    def spawn_bullet(self):
+        bx = self.player_x + 6
+        by = self.player_y + 6
+        speed = 4.5
+
+        vx, vy = 0, 0
+        if self.player_dir == "right":
+            vx = speed
+            bx += 10
+            by += 1
+        elif self.player_dir == "left":
+            vx = -speed
+            bx -= 2
+            by += 1
+        elif self.player_dir == "up":
+            vy = -speed
+            bx += 3
+            by -= 2
+        elif self.player_dir == "down":
+            vy = speed
+            bx += 3
+            by += 10
+
+        self.bullets.append({"x": bx, "y": by, "vx": vx, "vy": vy, "life": 60})
+
+        for _ in range(3):
+            self.particles.append({
+                "x": bx,
+                "y": by,
+                "vx": random.uniform(-0.4, 0.4),
+                "vy": random.uniform(-0.4, 0.4),
+                "life": 8,
+                "col": 10
+            })
+
+    def update_bullets(self):
+        for bullet in self.bullets:
+            bullet["x"] += bullet["vx"]
+            bullet["y"] += bullet["vy"]
+            bullet["life"] -= 1
+
+        self.bullets = [
+            b for b in self.bullets
+            if 0 <= b["x"] <= W and 0 <= b["y"] <= H and b["life"] > 0
+        ]
+
+    def update_enemies(self):
+        for enemy in self.enemies:
+            if not enemy["alive"]:
+                continue
+
+            dx = self.player_x - enemy["x"]
+            dy = self.player_y - enemy["y"]
+            dist = math.sqrt(dx * dx + dy * dy)
+
+            if dist != 0:
+                enemy["x"] += (dx / dist) * enemy["speed"]
+                enemy["y"] += (dy / dist) * enemy["speed"]
+
+    def update_particles(self):
+        for p in self.particles:
+            p["x"] += p["vx"]
+            p["y"] += p["vy"]
+            p["life"] -= 1
+
+        self.particles = [p for p in self.particles if p["life"] > 0]
+
+    def check_bullet_enemy_collisions(self):
+        bullets_to_remove = []
+
+        for bullet in self.bullets:
+            for enemy in self.enemies:
+                if not enemy["alive"]:
+                    continue
+
+                if (
+                    bullet["x"] >= enemy["x"]
+                    and bullet["x"] <= enemy["x"] + 10
+                    and bullet["y"] >= enemy["y"]
+                    and bullet["y"] <= enemy["y"] + 12
+                ):
+                    enemy["alive"] = False
+                    bullets_to_remove.append(bullet)
+                    self.score += 1
+
+                    for _ in range(8):
+                        self.particles.append({
+                            "x": enemy["x"] + 5,
+                            "y": enemy["y"] + 5,
+                            "vx": random.uniform(-1.0, 1.0),
+                            "vy": random.uniform(-1.0, 1.0),
+                            "life": random.randint(10, 18),
+                            "col": 7 if enemy["type"] == "normal" else 10
+                        })
+                    break
+
+        self.bullets = [b for b in self.bullets if b not in bullets_to_remove]
+
+    def check_enemy_player_collisions(self):
+        if self.invincible_timer > 0:
+            return
+
+        player_left = self.player_x + 2
+        player_right = self.player_x + 10
+        player_top = self.player_y
+        player_bottom = self.player_y + 12
+
+        for enemy in self.enemies:
+            if not enemy["alive"]:
+                continue
+
+            enemy_left = enemy["x"] + 1
+            enemy_right = enemy["x"] + 9
+            enemy_top = enemy["y"]
+            enemy_bottom = enemy["y"] + 11
+
+            overlap = (
+                player_right >= enemy_left
+                and player_left <= enemy_right
+                and player_bottom >= enemy_top
+                and player_top <= enemy_bottom
+            )
+
+            if overlap:
+                self.hearts -= 1
+                self.invincible_timer = 50
+
+                # knockback player a bit
+                if self.player_x < enemy["x"]:
+                    self.player_x -= 10
+                else:
+                    self.player_x += 10
+
+                if self.player_y < enemy["y"]:
+                    self.player_y -= 10
+                else:
+                    self.player_y += 10
+
+                self.player_x = max(20, min(self.player_x, W - 32))
+                self.player_y = max(28, min(self.player_y, H - 28))
+
+                # remove enemy that hit player
+                enemy["alive"] = False
+
+                for _ in range(6):
+                    self.particles.append({
+                        "x": enemy["x"] + 5,
+                        "y": enemy["y"] + 5,
+                        "vx": random.uniform(-0.9, 0.9),
+                        "vy": random.uniform(-0.9, 0.9),
+                        "life": random.randint(8, 14),
+                        "col": 8
+                    })
+                break
+
+    def cleanup_enemies(self):
+        self.enemies = [e for e in self.enemies if e["alive"]]
+
+    # ───────── DRAW ─────────
+    def draw(self):
+        pyxel.cls(0)
+
+        if self.state == "menu":
+            self.draw_menu()
+        elif self.state == "game_1":
+            self.draw_game1()
+        elif self.state == "game_1_over":
+            self.draw_game1_over()
+        elif self.state == "game_1_win":
+            self.draw_game1_win()
+        else:
+            self.draw_placeholder()
+
+    # ───────── MENU DRAW ─────────
+    def draw_menu(self):
+        for y in range(H):
+            pyxel.line(0, y, W, y, 1 if y < H // 2 else 0)
+
+        title = "PYXEL PORT"
+        scale = 4
+        start_x = (W - len(title) * (3 * scale + scale)) // 2
+        y = 40
+
+        for i, ch in enumerate(title):
+            self.draw_block_char(start_x + i * (3 * scale + scale), y, ch, scale, 8)
+
+        if pyxel.frame_count % 40 < 20:
+            text = "INSERT COIN"
+            pyxel.text((W - len(text) * 4) // 2, 95, text, 10)
+
+        pyxel.rect(80, 102, 160, 110, 0)
+        pyxel.rectb(80, 102, 160, 110, 7)
+
+        for i, game in enumerate(self.games):
+            yy = 122 + i * 14
+            if i == self.selected:
+                pyxel.circ(95, yy + 3, 2, 10)
+            pyxel.text(110, yy, game, 7)
+
+    # ───────── GAME 1 DRAW ─────────
+    def draw_game1(self):
+        self.draw_dungeon_room()
+        self.draw_ui()
+
+        for enemy in self.enemies:
+            self.draw_skeleton(int(enemy["x"]), int(enemy["y"]), enemy["type"])
+
+        for bullet in self.bullets:
+            pyxel.circ(int(bullet["x"]), int(bullet["y"]), 1, 10)
+
+        for p in self.particles:
+            pyxel.pset(int(p["x"]), int(p["y"]), p["col"])
+
+        if self.invincible_timer == 0 or pyxel.frame_count % 6 < 3:
+            self.draw_player(int(self.player_x), int(self.player_y))
+
+        pyxel.text(8, H - 10, "WASD move  SPACE shoot  TAB menu", 7)
+
+        if self.wave_banner_timer > 0:
+            banner = f"WAVE {self.wave}"
+            pyxel.rect(120, 18, 80, 16, 0)
+            pyxel.rectb(120, 18, 80, 16, 7)
+            pyxel.text((W - len(banner) * 4) // 2, 24, banner, 10)
+
+        if self.wave_cleared_timer > 0:
+            text = "WAVE CLEAR!"
+            pyxel.rect(110, 105, 100, 18, 0)
+            pyxel.rectb(110, 105, 100, 18, 7)
+            pyxel.text((W - len(text) * 4) // 2, 111, text, 11)
+
+    def draw_game1_over(self):
+        self.draw_dungeon_room()
+
+        pyxel.rect(70, 75, 180, 90, 0)
+        pyxel.rectb(70, 75, 180, 90, 7)
+
+        title = "GAME OVER"
+        pyxel.text((W - len(title) * 4) // 2, 95, title, 8)
+
+        score_text = f"SCORE: {self.score}"
+        pyxel.text((W - len(score_text) * 4) // 2, 113, score_text, 7)
+
+        wave_text = f"REACHED WAVE: {self.wave}"
+        pyxel.text((W - len(wave_text) * 4) // 2, 126, wave_text, 6)
+
+        retry_text = "PRESS ENTER TO TRY AGAIN"
+        pyxel.text((W - len(retry_text) * 4) // 2, 142, retry_text, 10)
+
+        menu_text = "TAB FOR MENU"
+        pyxel.text((W - len(menu_text) * 4) // 2, 155, menu_text, 6)
+
+    def draw_game1_win(self):
+        self.draw_dungeon_room()
+
+        pyxel.rect(65, 70, 190, 95, 0)
+        pyxel.rectb(65, 70, 190, 95, 7)
+
+        title = "YOU WIN!"
+        pyxel.text((W - len(title) * 4) // 2, 90, title, 11)
+
+        score_text = f"FINAL SCORE: {self.score}"
+        pyxel.text((W - len(score_text) * 4) // 2, 110, score_text, 7)
+
+        wave_text = f"ALL {self.max_waves} WAVES CLEARED"
+        pyxel.text((W - len(wave_text) * 4) // 2, 124, wave_text, 10)
+
+        retry_text = "PRESS ENTER TO PLAY AGAIN"
+        pyxel.text((W - len(retry_text) * 4) // 2, 142, retry_text, 9)
+
+        menu_text = "TAB FOR MENU"
+        pyxel.text((W - len(menu_text) * 4) // 2, 155, menu_text, 6)
+
+    def draw_dungeon_room(self):
+        pyxel.cls(5)
+
+        pyxel.rect(0, 0, W, 30, 5)
+        pyxel.rect(0, H - 30, W, 30, 5)
+
+        for x in range(0, W, 16):
+            pyxel.rectb(x, 0, 15, 15, 13)
+            pyxel.rectb(x, 15, 15, 15, 1)
+            pyxel.rectb(x, H - 30, 15, 15, 13)
+            pyxel.rectb(x, H - 15, 15, 15, 1)
+
+        pyxel.rect(0, 30, 32, H - 60, 1)
+        pyxel.rect(W - 32, 30, 32, H - 60, 1)
+
+        for y in range(30, H - 30, 16):
+            pyxel.rectb(0, y, 16, 15, 13)
+            pyxel.rectb(16, y, 16, 15, 13)
+            pyxel.rectb(W - 32, y, 16, 15, 13)
+            pyxel.rectb(W - 16, y, 16, 15, 13)
+
+        pyxel.rect(32, 30, W - 64, H - 60, 4)
+
+        pyxel.rect(48, 62, 38, 34, 15)
+        pyxel.rect(145, 145, 35, 30, 15)
+
+        for (x, y) in [(62, 80), (101, 88), (157, 111), (88, 192), (210, 160), (248, 181)]:
+            pyxel.line(x, y, x + 4, y, 1)
+            pyxel.line(x + 2, y - 2, x + 2, y + 2, 1)
+
+        self.draw_portal(170, 90)
+
+        pyxel.rect(6, 108, 18, 6, 12)
+        pyxel.rect(10, 114, 10, 4, 6)
+
+        pyxel.rect(W - 24, 100, 16, 36, 1)
+
+    def draw_portal(self, x, y):
+        pyxel.rect(x - 10, y - 2, 20, 16, 13)
+        pyxel.rect(x - 14, y - 6, 28, 10, 13)
+        pyxel.circ(x, y + 2, 10, 12)
+        pyxel.circ(x, y + 2, 8, 11)
+        pyxel.pset(x, y, 7)
+        pyxel.circ(x + 12, y + 14, 4, 3)
+
+    def draw_ui(self):
+        self.draw_big_digit(self.wave, 6, 58, 9)
+
+        heart_x = 26
+        for i in range(self.hearts):
+            self.draw_heart(heart_x + i * 30, 10)
+
+        pyxel.text(W - 58, 8, f"SCORE:{self.score}", 7)
+
+    def draw_heart(self, x, y):
+        pyxel.circ(x + 4, y + 4, 4, 8)
+        pyxel.circ(x + 10, y + 4, 4, 8)
+        pyxel.tri(x, y + 7, x + 14, y + 7, x + 7, y + 16, 8)
+
+    def draw_big_digit(self, digit, x, y, col):
+        patterns = {
+            "1": ["11", "01", "01", "01", "11"],
+            "2": ["111", "001", "111", "100", "111"],
+            "3": ["111", "001", "111", "001", "111"],
+            "4": ["101", "101", "111", "001", "001"],
+            "5": ["111", "100", "111", "001", "111"]
+        }
+        pattern = patterns[str(digit)]
+        s = 5
+        for row, line in enumerate(pattern):
+            for col_i, bit in enumerate(line):
+                if bit == "1":
+                    pyxel.rect(x + col_i * s, y + row * s, s, s, col)
+
+    def draw_player(self, x, y):
+        pyxel.ellib(x + 2, y + 10, 10, 3, 1)
+
+        if self.player_dir == "right":
+            pyxel.rect(x + 4, y, 3, 4, 15)
+            pyxel.rect(x + 3, y + 4, 5, 5, 12)
+            pyxel.rect(x + 7, y + 4, 4, 2, 0)
+            pyxel.rect(x + 9, y + 3, 3, 1, 12)
+            pyxel.rect(x + 10, y + 5, 2, 1, 6)
+            pyxel.rect(x + 4, y + 9, 2, 3, 5)
+            pyxel.rect(x + 6, y + 9, 2, 3, 5)
+
+        elif self.player_dir == "left":
+            pyxel.rect(x + 5, y, 3, 4, 15)
+            pyxel.rect(x + 4, y + 4, 5, 5, 12)
+            pyxel.rect(x, y + 4, 4, 2, 0)
+            pyxel.rect(x, y + 3, 3, 1, 12)
+            pyxel.rect(x, y + 5, 2, 1, 6)
+            pyxel.rect(x + 4, y + 9, 2, 3, 5)
+            pyxel.rect(x + 6, y + 9, 2, 3, 5)
+
+        elif self.player_dir == "up":
+            pyxel.rect(x + 4, y + 1, 3, 3, 15)
+            pyxel.rect(x + 3, y + 4, 5, 5, 12)
+            pyxel.rect(x + 5, y - 1, 2, 4, 0)
+            pyxel.rect(x + 4, y - 1, 4, 1, 12)
+            pyxel.rect(x + 4, y + 9, 2, 3, 5)
+            pyxel.rect(x + 6, y + 9, 2, 3, 5)
+
+        elif self.player_dir == "down":
+            pyxel.rect(x + 4, y, 3, 3, 15)
+            pyxel.rect(x + 3, y + 3, 5, 5, 12)
+            pyxel.rect(x + 5, y + 8, 2, 4, 0)
+            pyxel.rect(x + 4, y + 10, 4, 1, 12)
+            pyxel.rect(x + 4, y + 9, 2, 3, 5)
+            pyxel.rect(x + 6, y + 9, 2, 3, 5)
+
+    def draw_skeleton(self, x, y, enemy_type="normal"):
+        pyxel.ellib(x + 1, y + 10, 10, 3, 1)
+
+        skull_col = 7 if enemy_type == "normal" else 10
+
+        pyxel.rect(x + 3, y, 4, 4, skull_col)
+        pyxel.pset(x + 4, y + 1, 0)
+        pyxel.pset(x + 5, y + 1, 0)
+
+        pyxel.rect(x + 3, y + 4, 4, 4, 7)
+
+        pyxel.rect(x + 1, y + 4, 2, 1, 7)
+        pyxel.rect(x + 7, y + 4, 2, 1, 7)
+
+        pyxel.pset(x + 9, y + 4, 8)
+
+        pyxel.rect(x + 3, y + 8, 1, 3, 7)
+        pyxel.rect(x + 6, y + 8, 1, 3, 7)
+
+    # ───────── LETTER DRAWING ─────────
+    def draw_block_char(self, x, y, ch, s, col):
+        patterns = {
+            "P": ["110", "101", "110", "100", "100"],
+            "Y": ["101", "101", "010", "010", "010"],
+            "X": ["101", "010", "010", "010", "101"],
+            "E": ["111", "100", "110", "100", "111"],
+            "L": ["100", "100", "100", "100", "111"],
+            "O": ["111", "101", "101", "101", "111"],
+            "R": ["110", "101", "110", "101", "101"],
+            "T": ["111", "010", "010", "010", "010"],
+            " ": ["000"]
+        }
+
+        pattern = patterns.get(ch, patterns[" "])
+
+        for row, line in enumerate(pattern):
+            for col_i, bit in enumerate(line):
+                if bit == "1":
+                    pyxel.rect(x + col_i * s, y + row * s, s, s, col)
+
+    # ───────── PLACEHOLDER DRAW ─────────
+    def draw_placeholder(self):
+        pyxel.cls(0)
+
+        game_index = int(self.state.split("_")[1])
+        game_name = self.games[game_index - 1]
+
+        msg = f"INSERT {game_name} HERE"
+        pyxel.text((W - len(msg) * 4) // 2, H // 2, msg, 7)
+
+        pyxel.text(5, H - 10, "TAB to return", 5)
+        esc_text = "ESC to exit"
+        pyxel.text(W - len(esc_text) * 4 - 5, H - 10, esc_text, 5)
+
+
+App()
