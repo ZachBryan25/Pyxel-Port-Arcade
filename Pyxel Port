@@ -6,6 +6,52 @@ import time
 # SCREEN SIZE
 W, H = 320, 240
 
+# ───────── SOLITAIRE CONSTANTS ─────────
+CARD_W = 20
+CARD_H = 28
+TABLEAU_GAP_Y = 10
+
+STOCK_X, STOCK_Y = 10, 10
+WASTE_X, WASTE_Y = 40, 10
+FOUNDATION_X_START, FOUNDATION_Y = 180, 10
+TABLEAU_X_START, TABLEAU_Y = 10, 60
+PILE_SPACING_X = 30
+
+
+# ───────── SOLITAIRE CARD CLASS ─────────
+class Card:
+    def __init__(self, suit, rank):
+        self.suit = suit          # "H", "D", "C", "S"
+        self.rank = rank          # 1-13
+        self.face_up = False
+
+    def is_red(self):
+        return self.suit in ["H", "D"]
+
+    def label(self):
+        return rank_to_text(self.rank) + suit_symbol(self.suit)
+
+
+def rank_to_text(rank):
+    if rank == 1:
+        return "A"
+    if rank == 11:
+        return "J"
+    if rank == 12:
+        return "Q"
+    if rank == 13:
+        return "K"
+    return str(rank)
+
+
+def suit_symbol(suit):
+    return {
+        "H": "h",
+        "D": "d",
+        "C": "c",
+        "S": "s"
+    }[suit]
+
 
 # ───────── RANDOM ACCESS MATCH GAME ─────────
 class RandomAccessMatch:
@@ -239,6 +285,7 @@ class RandomAccessMatch:
 class App:
     def __init__(self):
         pyxel.init(W, H, title="Pyxel Port", fps=60)
+        pyxel.mouse(True)
 
         pyxel.sound(0).set("c3e3g3", "p", "7", "s", 5)
         pyxel.sound(1).set("c2", "p", "6", "s", 10)
@@ -250,7 +297,7 @@ class App:
             "Pong",
             "Random Access Match",
             "Space Invaders",
-            "Game 5"
+            "Solitaire"
         ]
 
         self.selected = 0
@@ -260,6 +307,7 @@ class App:
         self.reset_game2()
         self.ram_game = RandomAccessMatch()
         self.reset_game4()
+        self.reset_game5()
 
         pyxel.run(self.update, self.draw)
 
@@ -340,6 +388,35 @@ class App:
                     "alive": True
                 })
 
+    # ───────── RESET GAME 5 (SOLITAIRE) ─────────
+    def reset_game5(self):
+        self.g5_stock = []
+        self.g5_waste = []
+        self.g5_foundations = [[], [], [], []]
+        self.g5_tableau = [[] for _ in range(7)]
+
+        self.g5_selected_cards = None
+        self.g5_selected_source = None
+        self.g5_message = ""
+        self.g5_win = False
+
+        deck = self.g5_create_deck()
+
+        for col in range(7):
+            for row in range(col + 1):
+                card = deck.pop()
+                if row == col:
+                    card.face_up = True
+                self.g5_tableau[col].append(card)
+
+        self.g5_stock = deck
+
+    def g5_create_deck(self):
+        suits = ["H", "D", "C", "S"]
+        deck = [Card(suit, rank) for suit in suits for rank in range(1, 14)]
+        random.shuffle(deck)
+        return deck
+
     # ───────── UPDATE ─────────
     def update(self):
         if pyxel.btnp(pyxel.KEY_ESCAPE):
@@ -364,6 +441,8 @@ class App:
                     self.ram_game.start()
                 elif self.state == "game_4":
                     self.reset_game4()
+                elif self.state == "game_5":
+                    self.reset_game5()
 
         elif self.state == "game_1":
             self.update_game1()
@@ -420,7 +499,15 @@ class App:
             if pyxel.btnp(pyxel.KEY_TAB):
                 self.state = "menu"
 
-        elif self.state.startswith("game_"):
+        elif self.state == "game_5":
+            self.update_game5()
+            if pyxel.btnp(pyxel.KEY_TAB):
+                self.state = "menu"
+
+        elif self.state == "game_5_win":
+            if pyxel.btnp(pyxel.KEY_RETURN):
+                self.reset_game5()
+                self.state = "game_5"
             if pyxel.btnp(pyxel.KEY_TAB):
                 self.state = "menu"
 
@@ -848,6 +935,201 @@ class App:
         if all(not e["alive"] for e in self.g4_enemies):
             self.state = "game_4_win"
 
+    # ───────── GAME 5 UPDATE (SOLITAIRE) ─────────
+    def update_game5(self):
+        if self.g5_win:
+            return
+
+        if pyxel.btnp(pyxel.KEY_R):
+            self.reset_game5()
+            return
+
+        if self.g5_check_win():
+            self.g5_win = True
+            self.state = "game_5_win"
+            return
+
+        if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
+            mx = pyxel.mouse_x
+            my = pyxel.mouse_y
+            self.g5_handle_click(mx, my)
+
+    def g5_handle_click(self, mx, my):
+        self.g5_message = ""
+
+        if self.g5_point_in_rect(mx, my, STOCK_X, STOCK_Y, CARD_W, CARD_H):
+            if self.g5_selected_cards is None:
+                self.g5_draw_from_stock()
+            else:
+                self.g5_clear_selection()
+            return
+
+        if self.g5_point_in_rect(mx, my, WASTE_X, WASTE_Y, CARD_W, CARD_H):
+            if self.g5_waste:
+                if self.g5_selected_cards is None:
+                    self.g5_select_waste()
+                else:
+                    self.g5_try_move_to_waste()
+            return
+
+        for i in range(4):
+            fx = FOUNDATION_X_START + i * PILE_SPACING_X
+            fy = FOUNDATION_Y
+            if self.g5_point_in_rect(mx, my, fx, fy, CARD_W, CARD_H):
+                if self.g5_selected_cards is None:
+                    self.g5_select_foundation(i)
+                else:
+                    self.g5_try_move_to_foundation(i)
+                return
+
+        for col in range(7):
+            result = self.g5_get_tableau_clicked(col, mx, my)
+            if result is not None:
+                clicked_index = result
+                if self.g5_selected_cards is None:
+                    self.g5_select_tableau(col, clicked_index)
+                else:
+                    self.g5_try_move_to_tableau(col)
+                return
+
+        for col in range(7):
+            tx = TABLEAU_X_START + col * PILE_SPACING_X
+            ty = TABLEAU_Y
+            empty_h = CARD_H if not self.g5_tableau[col] else CARD_H + (len(self.g5_tableau[col]) - 1) * TABLEAU_GAP_Y
+            if self.g5_point_in_rect(mx, my, tx, ty, CARD_W, empty_h):
+                if self.g5_selected_cards is not None:
+                    self.g5_try_move_to_tableau(col)
+                    return
+
+        self.g5_clear_selection()
+
+    def g5_draw_from_stock(self):
+        if self.g5_stock:
+            card = self.g5_stock.pop()
+            card.face_up = True
+            self.g5_waste.append(card)
+        else:
+            while self.g5_waste:
+                card = self.g5_waste.pop()
+                card.face_up = False
+                self.g5_stock.append(card)
+
+    def g5_select_waste(self):
+        if self.g5_waste:
+            self.g5_selected_cards = [self.g5_waste[-1]]
+            self.g5_selected_source = ("waste", None)
+
+    def g5_select_foundation(self, foundation_index):
+        pile = self.g5_foundations[foundation_index]
+        if pile:
+            self.g5_selected_cards = [pile[-1]]
+            self.g5_selected_source = ("foundation", foundation_index)
+
+    def g5_select_tableau(self, col, index):
+        pile = self.g5_tableau[col]
+        if index < 0 or index >= len(pile):
+            return
+        if not pile[index].face_up:
+            return
+        self.g5_selected_cards = pile[index:]
+        self.g5_selected_source = ("tableau", col, index)
+
+    def g5_try_move_to_foundation(self, foundation_index):
+        if self.g5_selected_cards is None:
+            return
+        if len(self.g5_selected_cards) != 1:
+            self.g5_message = "Only one card to foundation"
+            return
+        card = self.g5_selected_cards[0]
+        foundation = self.g5_foundations[foundation_index]
+        if self.g5_valid_foundation_move(card, foundation):
+            self.g5_remove_selected_from_source()
+            self.g5_foundations[foundation_index].append(card)
+            self.g5_after_tableau_move_cleanup()
+            self.g5_clear_selection()
+        else:
+            self.g5_message = "Invalid foundation move"
+
+    def g5_try_move_to_tableau(self, col):
+        if self.g5_selected_cards is None:
+            return
+        dest_pile = self.g5_tableau[col]
+        first_card = self.g5_selected_cards[0]
+        if self.g5_selected_source and self.g5_selected_source[0] == "tableau":
+            src_col = self.g5_selected_source[1]
+            if src_col == col:
+                self.g5_clear_selection()
+                return
+        if self.g5_valid_tableau_move(first_card, dest_pile):
+            moved_cards = self.g5_selected_cards[:]
+            self.g5_remove_selected_from_source()
+            self.g5_tableau[col].extend(moved_cards)
+            self.g5_after_tableau_move_cleanup()
+            self.g5_clear_selection()
+        else:
+            self.g5_message = "Invalid tableau move"
+
+    def g5_try_move_to_waste(self):
+        self.g5_message = "Cannot move onto waste"
+
+    def g5_remove_selected_from_source(self):
+        if self.g5_selected_source is None or self.g5_selected_cards is None:
+            return
+        source_type = self.g5_selected_source[0]
+        if source_type == "waste":
+            self.g5_waste.pop()
+        elif source_type == "foundation":
+            foundation_index = self.g5_selected_source[1]
+            self.g5_foundations[foundation_index].pop()
+        elif source_type == "tableau":
+            col = self.g5_selected_source[1]
+            index = self.g5_selected_source[2]
+            self.g5_tableau[col] = self.g5_tableau[col][:index]
+
+    def g5_after_tableau_move_cleanup(self):
+        if self.g5_selected_source and self.g5_selected_source[0] == "tableau":
+            src_col = self.g5_selected_source[1]
+            if self.g5_tableau[src_col]:
+                if not self.g5_tableau[src_col][-1].face_up:
+                    self.g5_tableau[src_col][-1].face_up = True
+
+    def g5_clear_selection(self):
+        self.g5_selected_cards = None
+        self.g5_selected_source = None
+
+    def g5_valid_foundation_move(self, card, foundation):
+        if not foundation:
+            return card.rank == 1
+        top = foundation[-1]
+        return card.suit == top.suit and card.rank == top.rank + 1
+
+    def g5_valid_tableau_move(self, card, dest_pile):
+        if not dest_pile:
+            return card.rank == 13
+        top = dest_pile[-1]
+        if not top.face_up:
+            return False
+        return (card.is_red() != top.is_red()) and (card.rank == top.rank - 1)
+
+    def g5_check_win(self):
+        return all(len(f) == 13 for f in self.g5_foundations)
+
+    def g5_get_tableau_clicked(self, col, mx, my):
+        pile = self.g5_tableau[col]
+        x = TABLEAU_X_START + col * PILE_SPACING_X
+        y = TABLEAU_Y
+        if not pile:
+            return None
+        for i in range(len(pile) - 1, -1, -1):
+            cy = y + i * TABLEAU_GAP_Y
+            h = CARD_H if i == len(pile) - 1 else TABLEAU_GAP_Y + 2
+            if self.g5_point_in_rect(mx, my, x, cy, CARD_W, h):
+                return i
+        return None
+
+    def g5_point_in_rect(self, px, py, x, y, w, h):
+        return x <= px < x + w and y <= py < y + h
+
     # ───────── DRAW ─────────
     def draw(self):
         pyxel.cls(0)
@@ -872,8 +1154,10 @@ class App:
             self.draw_game4_over()
         elif self.state == "game_4_win":
             self.draw_game4_win()
-        else:
-            self.draw_placeholder()
+        elif self.state == "game_5":
+            self.draw_game5()
+        elif self.state == "game_5_win":
+            self.draw_game5_win()
 
     # ───────── MENU DRAW ─────────
     def draw_menu(self):
@@ -1065,6 +1349,99 @@ class App:
         menu_text = "TAB FOR MENU"
         pyxel.text((W - len(menu_text) * 4) // 2, 152, menu_text, 6)
 
+    # ───────── GAME 5 DRAW (SOLITAIRE) ─────────
+    def draw_game5(self):
+        pyxel.cls(3)
+
+        pyxel.text(10, 2, "STOCK", 7)
+        pyxel.text(40, 2, "WASTE", 7)
+        pyxel.text(180, 2, "FOUNDATIONS", 7)
+
+        if self.g5_stock:
+            pyxel.rect(STOCK_X, STOCK_Y, CARD_W, CARD_H, 5)
+            pyxel.rectb(STOCK_X, STOCK_Y, CARD_W, CARD_H, 0)
+            pyxel.text(STOCK_X + 3, STOCK_Y + 10, "[]", 1)
+        else:
+            self.g5_draw_empty_slot(STOCK_X, STOCK_Y)
+
+        if self.g5_waste:
+            selected = self.g5_selected_source == ("waste", None)
+            self.g5_draw_card(WASTE_X, WASTE_Y, self.g5_waste[-1], selected)
+        else:
+            self.g5_draw_empty_slot(WASTE_X, WASTE_Y)
+
+        for i in range(4):
+            x = FOUNDATION_X_START + i * PILE_SPACING_X
+            y = FOUNDATION_Y
+            pile = self.g5_foundations[i]
+            if pile:
+                selected = self.g5_selected_source == ("foundation", i)
+                self.g5_draw_card(x, y, pile[-1], selected)
+            else:
+                self.g5_draw_empty_slot(x, y)
+
+        for col in range(7):
+            x = TABLEAU_X_START + col * PILE_SPACING_X
+            y = TABLEAU_Y
+            pile = self.g5_tableau[col]
+
+            if not pile:
+                self.g5_draw_empty_slot(x, y)
+                continue
+
+            for i, card in enumerate(pile):
+                cy = y + i * TABLEAU_GAP_Y
+
+                selected = False
+                if self.g5_selected_source and self.g5_selected_source[0] == "tableau":
+                    src_col = self.g5_selected_source[1]
+                    src_index = self.g5_selected_source[2]
+                    if src_col == col and i >= src_index:
+                        selected = True
+
+                self.g5_draw_card(x, cy, card, selected)
+
+        pyxel.text(10, H - 18, "Click cards to select/move  R=restart  TAB=menu", 7)
+
+        if self.g5_message:
+            pyxel.text(10, H - 9, self.g5_message, 8)
+
+    def draw_game5_win(self):
+        pyxel.cls(3)
+
+        pyxel.rect(70, 90, 180, 60, 0)
+        pyxel.rectb(70, 90, 180, 60, 10)
+
+        title = "YOU WIN!"
+        pyxel.text((W - len(title) * 4) // 2, 105, title, 11)
+
+        retry_text = "PRESS ENTER TO PLAY AGAIN"
+        pyxel.text((W - len(retry_text) * 4) // 2, 122, retry_text, 10)
+
+        menu_text = "TAB FOR MENU"
+        pyxel.text((W - len(menu_text) * 4) // 2, 136, menu_text, 6)
+
+    def g5_draw_card(self, x, y, card, selected=False):
+        if card.face_up:
+            pyxel.rect(x, y, CARD_W, CARD_H, 7)
+            border = 10 if selected else 0
+            pyxel.rectb(x, y, CARD_W, CARD_H, border)
+            rank = rank_to_text(card.rank)
+            suit = suit_symbol(card.suit)
+            color = 8 if card.is_red() else 0
+            pyxel.text(x + 2, y + 2, rank, color)
+            pyxel.text(x + 2, y + 10, suit, color)
+            pyxel.text(x + CARD_W - 10, y + CARD_H - 10, rank, color)
+            pyxel.text(x + CARD_W - 10, y + CARD_H - 18, suit, color)
+        else:
+            pyxel.rect(x, y, CARD_W, CARD_H, 5)
+            pyxel.rectb(x, y, CARD_W, CARD_H, 0)
+            pyxel.text(x + 5, y + 10, "[]", 1)
+
+    def g5_draw_empty_slot(self, x, y):
+        pyxel.rectb(x, y, CARD_W, CARD_H, 6)
+
+    # ───────── SHARED DRAW HELPERS ─────────
     def draw_invader(self, x, y):
         pyxel.rect(x + 2, y, 8, 3, 8)
         pyxel.rect(x, y + 3, 12, 3, 8)
@@ -1219,19 +1596,6 @@ class App:
             for col_i, bit in enumerate(line):
                 if bit == "1":
                     pyxel.rect(x + col_i * s, y + row * s, s, s, col)
-
-    def draw_placeholder(self):
-        pyxel.cls(0)
-
-        game_index = int(self.state.split("_")[1])
-        game_name = self.games[game_index - 1]
-
-        msg = f"INSERT {game_name} HERE"
-        pyxel.text((W - len(msg) * 4) // 2, H // 2, msg, 7)
-
-        pyxel.text(5, H - 10, "TAB to return", 5)
-        esc_text = "ESC to exit"
-        pyxel.text(W - len(esc_text) * 4 - 5, H - 10, esc_text, 5)
 
 
 App()
