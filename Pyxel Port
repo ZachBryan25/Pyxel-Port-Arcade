@@ -6,6 +6,60 @@ import time
 # SCREEN SIZE
 W, H = 320, 240
 
+# ───────── SOLITAIRE CONSTANTS ─────────
+CARD_W = 20
+CARD_H = 28
+TABLEAU_GAP_Y = 10
+
+STOCK_X, STOCK_Y = 10, 10
+WASTE_X, WASTE_Y = 40, 10
+FOUNDATION_X_START, FOUNDATION_Y = 180, 10
+TABLEAU_X_START, TABLEAU_Y = 10, 60
+PILE_SPACING_X = 30
+
+# ───────── PONG CONSTANTS ─────────
+PONG_PADDLE_HEIGHT = 40
+PONG_BALL_START_SPEED = 3
+PONG_WINNING_SCORE = 5
+PONG_PLAYER_SPEED = 4
+PONG_HIT_SPEED_INCREASE = 1.08
+PONG_MAX_SPEED = 9
+
+
+# ───────── SOLITAIRE CARD CLASS ─────────
+class Card:
+    def __init__(self, suit, rank):
+        self.suit = suit          # "H", "D", "C", "S"
+        self.rank = rank          # 1-13
+        self.face_up = False
+
+    def is_red(self):
+        return self.suit in ["H", "D"]
+
+    def label(self):
+        return rank_to_text(self.rank) + suit_symbol(self.suit)
+
+
+def rank_to_text(rank):
+    if rank == 1:
+        return "A"
+    if rank == 11:
+        return "J"
+    if rank == 12:
+        return "Q"
+    if rank == 13:
+        return "K"
+    return str(rank)
+
+
+def suit_symbol(suit):
+    return {
+        "H": "h",
+        "D": "d",
+        "C": "c",
+        "S": "s"
+    }[suit]
+
 
 # ───────── RANDOM ACCESS MATCH GAME ─────────
 class RandomAccessMatch:
@@ -236,32 +290,144 @@ class RandomAccessMatch:
         pyxel.text(tx, ty, text, 1)
 
 
+# ───────── MUSIC SETUP ─────────
+def setup_menu_music():
+    pyxel.sound(2).set(
+        notes ="c3 e3 g3 e3 c3 e3 g3 b3 a3 g3 e3 c3 e3 g3 a3 r",
+        tones ="s  s  s  s  s  s  s  s  s  s  s  s  s  s  s  s",
+        volumes="6  5  6  5  6  5  7  6  6  6  5  5  6  6  7  0",
+        effects="n  n  n  n  n  n  n  s  n  n  n  n  n  n  s  n",
+        speed =7
+    )
+
+    pyxel.sound(3).set(
+        notes ="g3 a3 g3 e3 f3 e3 d3 c3 e3 g3 c3 r  c3 e3 g3 r",
+        tones ="s  s  s  s  s  s  s  s  s  s  s  s  s  s  s  s",
+        volumes="6  6  6  5  6  5  5  6  5  6  7  0  5  5  6  0",
+        effects="n  n  n  n  n  n  n  s  n  n  s  n  n  n  s  n",
+        speed =7
+    )
+
+    pyxel.sound(10).set(
+        notes ="c2 c2 c2 c2 c2 c2 g2 g2 a1 a1 c2 c2 c2 c2 g2 g2",
+        tones ="t  t  t  t  t  t  t  t  t  t  t  t  t  t  t  t",
+        volumes="5  4  5  4  5  4  5  4  5  4  5  4  5  4  5  4",
+        effects="n  n  n  n  n  n  n  n  n  n  n  n  n  n  n  n",
+        speed =7
+    )
+
+    pyxel.sound(11).set(
+        notes ="g1 g1 g1 g1 f1 f1 f1 f1 c2 c2 c2 c2 c2 c2 c2 c2",
+        tones ="t  t  t  t  t  t  t  t  t  t  t  t  t  t  t  t",
+        volumes="5  4  5  4  5  4  5  4  5  4  5  4  5  4  5  4",
+        effects="n  n  n  n  n  n  n  n  n  n  n  n  n  n  n  n",
+        speed =7
+    )
+
+    pyxel.sound(14).set(
+        notes ="a0 r  r  r  a0 r  r  r  a0 r  r  r  a0 r  r  r",
+        tones ="n  n  n  n  n  n  n  n  n  n  n  n  n  n  n  n",
+        volumes="7  0  0  0  7  0  0  0  7  0  0  0  7  0  0  0",
+        effects="f  n  n  n  f  n  n  n  f  n  n  n  f  n  n  n",
+        speed =7
+    )
+
+    pyxel.sound(15).set(
+        notes ="a0 r  a0 r  a0 r  a0 r  a0 r  a0 r  a0 r  a0 r",
+        tones ="n  n  n  n  n  n  n  n  n  n  n  n  n  n  n  n",
+        volumes="3  0  2  0  3  0  2  0  3  0  2  0  3  0  2  0",
+        effects="f  n  f  n  f  n  f  n  f  n  f  n  f  n  f  n",
+        speed =7
+    )
+
+    pyxel.music(0).set(
+        [],
+        [10, 11, 10, 11],
+        [14, 14, 14, 14],
+        [15, 15, 15, 15],
+    )
+
+
 class App:
     def __init__(self):
         pyxel.init(W, H, title="Pyxel Port", fps=60)
+        pyxel.mouse(True)
 
         pyxel.sound(0).set("c3e3g3", "p", "7", "s", 5)
         pyxel.sound(1).set("c2", "p", "6", "s", 10)
 
+        setup_menu_music()
+
         self.state = "menu"
+        self.music_playing = False
+        self.music_muted = False
 
         self.games = [
             "Dungeon Shooter",
             "Pong",
             "Random Access Match",
             "Space Invaders",
-            "Game 5"
+            "Solitaire"
         ]
 
         self.selected = 0
+
+        rng = random.Random(42)
+        self.stars = [
+            {
+                "x": rng.randint(0, W - 1),
+                "y": rng.randint(0, H - 1),
+                "speed": rng.choice([0.2, 0.4, 0.7, 1.0]),
+                "col": rng.choice([1, 5, 6, 7, 13])
+            }
+            for _ in range(80)
+        ]
+
+        self.menu_highlight_y = float(139)
+        self.menu_highlight_target_y = float(139)
+
+        self.menu_preview_rects = [
+            [
+                (0, 0, W, H, 5),
+                (30, 30, W-60, H-60, 4),
+                (0, 0, W, 28, 1), (0, H-28, W, 28, 1),
+                (0, 28, 28, H-56, 1), (W-28, 28, 28, H-56, 1),
+            ],
+            [(0, 0, W, H, 0)],
+            [(0, 0, W, H, 0), (50, 40, 220, 160, 2)],
+            [(0, 0, W, H, 0), (0, 0, W, 3, 1)],
+            [(0, 0, W, H, 3)],
+        ]
 
         self.max_waves = 5
         self.reset_game1()
         self.reset_game2()
         self.ram_game = RandomAccessMatch()
         self.reset_game4()
+        self.reset_game5()
 
         pyxel.run(self.update, self.draw)
+
+    # ───────── MUSIC HELPERS ─────────
+    def start_menu_music(self):
+        if not self.music_playing and not self.music_muted:
+            pyxel.playm(0, loop=True)
+            self.music_playing = True
+
+    def stop_menu_music(self):
+        if self.music_playing:
+            pyxel.stop(0)
+            pyxel.stop(1)
+            pyxel.stop(2)
+            pyxel.stop(3)
+            self.music_playing = False
+
+    def toggle_mute(self):
+        self.music_muted = not self.music_muted
+        if self.music_muted:
+            self.stop_menu_music()
+        else:
+            self.start_menu_music()
 
     # ───────── RESET GAME 1 ─────────
     def reset_game1(self):
@@ -292,16 +458,26 @@ class App:
 
     # ───────── RESET GAME 2 (PONG) ─────────
     def reset_game2(self):
-        self.paddle_y = H // 2 - 20
-        self.enemy_y = H // 2 - 20
-        self.ball_x = W // 2
-        self.ball_y = H // 2
-        self.ball_vx = 3
-        self.ball_vy = 2
+        self.paddle_y = H // 2 - PONG_PADDLE_HEIGHT // 2
+        self.enemy_y = H // 2 - PONG_PADDLE_HEIGHT // 2
+        self.ball_x = float(W // 2)
+        self.ball_y = float(H // 2)
+        self.ball_vx = float(PONG_BALL_START_SPEED)
+        self.ball_vy = float(PONG_BALL_START_SPEED)
         self.player_score = 0
         self.enemy_score = 0
         self.game2_over = False
         self.game2_winner = ""
+
+    def reset_ball_game2(self, direction):
+        self.ball_x = float(W // 2)
+        self.ball_y = float(H // 2)
+        self.ball_vx = float(PONG_BALL_START_SPEED * direction)
+        self.ball_vy = float(PONG_BALL_START_SPEED)
+
+    def increase_ball_speed_game2(self):
+        self.ball_vx = max(min(self.ball_vx * PONG_HIT_SPEED_INCREASE, PONG_MAX_SPEED), -PONG_MAX_SPEED)
+        self.ball_vy = max(min(self.ball_vy * PONG_HIT_SPEED_INCREASE, PONG_MAX_SPEED), -PONG_MAX_SPEED)
 
     # ───────── RESET GAME 4 (SPACE INVADERS) ─────────
     def reset_game4(self):
@@ -340,19 +516,55 @@ class App:
                     "alive": True
                 })
 
+    # ───────── RESET GAME 5 (SOLITAIRE) ─────────
+    def reset_game5(self):
+        self.g5_stock = []
+        self.g5_waste = []
+        self.g5_foundations = [[], [], [], []]
+        self.g5_tableau = [[] for _ in range(7)]
+
+        self.g5_selected_cards = None
+        self.g5_selected_source = None
+        self.g5_message = ""
+        self.g5_win = False
+
+        deck = self.g5_create_deck()
+
+        for col in range(7):
+            for row in range(col + 1):
+                card = deck.pop()
+                if row == col:
+                    card.face_up = True
+                self.g5_tableau[col].append(card)
+
+        self.g5_stock = deck
+
+    def g5_create_deck(self):
+        suits = ["H", "D", "C", "S"]
+        deck = [Card(suit, rank) for suit in suits for rank in range(1, 14)]
+        random.shuffle(deck)
+        return deck
+
     # ───────── UPDATE ─────────
     def update(self):
         if pyxel.btnp(pyxel.KEY_ESCAPE):
             pyxel.quit()
 
         if self.state == "menu":
+            self.start_menu_music()
+            self.update_menu()
+
             if pyxel.btnp(pyxel.KEY_DOWN):
                 self.selected = (self.selected + 1) % len(self.games)
 
             if pyxel.btnp(pyxel.KEY_UP):
                 self.selected = (self.selected - 1) % len(self.games)
 
+            if pyxel.btnp(pyxel.KEY_M):
+                self.toggle_mute()
+
             if pyxel.btnp(pyxel.KEY_RETURN):
+                self.stop_menu_music()
                 self.state = f"game_{self.selected + 1}"
 
                 if self.state == "game_1":
@@ -364,6 +576,8 @@ class App:
                     self.ram_game.start()
                 elif self.state == "game_4":
                     self.reset_game4()
+                elif self.state == "game_5":
+                    self.reset_game5()
 
         elif self.state == "game_1":
             self.update_game1()
@@ -420,9 +634,20 @@ class App:
             if pyxel.btnp(pyxel.KEY_TAB):
                 self.state = "menu"
 
-        elif self.state.startswith("game_"):
+        elif self.state == "game_5":
+            self.update_game5()
             if pyxel.btnp(pyxel.KEY_TAB):
                 self.state = "menu"
+
+        elif self.state == "game_5_win":
+            if pyxel.btnp(pyxel.KEY_RETURN):
+                self.reset_game5()
+                self.state = "game_5"
+            if pyxel.btnp(pyxel.KEY_TAB):
+                self.state = "menu"
+
+        if self.state == "menu" and not self.music_playing:
+            self.start_menu_music()
 
     # ───────── GAME 1 UPDATE ─────────
     def update_game1(self):
@@ -682,59 +907,75 @@ class App:
         if self.game2_over:
             return
 
+        self.update_game2_player()
+        self.update_game2_enemy()
+        self.update_game2_ball()
+        self.check_game2_score()
+        self.check_game2_over()
+
+    def update_game2_player(self):
         if pyxel.btn(pyxel.KEY_UP):
-            self.paddle_y -= 4
+            self.paddle_y -= PONG_PLAYER_SPEED
         if pyxel.btn(pyxel.KEY_DOWN):
-            self.paddle_y += 4
+            self.paddle_y += PONG_PLAYER_SPEED
+        self.paddle_y = max(0, min(H - PONG_PADDLE_HEIGHT, self.paddle_y))
 
-        self.paddle_y = max(0, min(H - 40, self.paddle_y))
+    def update_game2_enemy(self):
+        enemy_speed = 4.8
 
-        if self.ball_y > self.enemy_y + 20:
-            self.enemy_y += 3
-        elif self.ball_y < self.enemy_y + 20:
-            self.enemy_y -= 3
+        # slight delay every 5 frames
+        if pyxel.frame_count % 5 == 0:
+            return
 
-        self.enemy_y = max(0, min(H - 40, self.enemy_y))
+        target_y = self.ball_y - PONG_PADDLE_HEIGHT // 2
 
+        # occasional mistake
+        if pyxel.frame_count % 90 < 15:
+            target_y += 10
+
+        if target_y > self.enemy_y:
+            self.enemy_y += enemy_speed
+        elif target_y < self.enemy_y:
+            self.enemy_y -= enemy_speed
+
+        self.enemy_y = max(0, min(H - PONG_PADDLE_HEIGHT, self.enemy_y))
+
+    def update_game2_ball(self):
         self.ball_x += self.ball_vx
         self.ball_y += self.ball_vy
 
-        if self.ball_y <= 3 or self.ball_y >= H - 3:
+        if self.ball_y <= 0 or self.ball_y >= H:
             self.ball_vy *= -1
 
-        if (
-            self.ball_x <= 15
-            and self.paddle_y <= self.ball_y <= self.paddle_y + 40
-            and self.ball_vx < 0
-        ):
-            self.ball_vx *= -1
+        # player paddle hit
+        if (self.ball_x <= 15 and
+                self.paddle_y <= self.ball_y <= self.paddle_y + PONG_PADDLE_HEIGHT and
+                self.ball_vx < 0):
+            self.ball_vx = abs(self.ball_vx)
+            self.increase_ball_speed_game2()
 
-        if (
-            self.ball_x >= W - 15
-            and self.enemy_y <= self.ball_y <= self.enemy_y + 40
-            and self.ball_vx > 0
-        ):
-            self.ball_vx *= -1
+        # enemy paddle hit
+        if (self.ball_x >= W - 15 and
+                self.enemy_y <= self.ball_y <= self.enemy_y + PONG_PADDLE_HEIGHT and
+                self.ball_vx > 0):
+            self.ball_vx = -abs(self.ball_vx)
+            self.increase_ball_speed_game2()
 
+    def check_game2_score(self):
         if self.ball_x < 0:
             self.enemy_score += 1
-            self.ball_x = W // 2
-            self.ball_y = H // 2
-            self.ball_vx = 3
-            self.ball_vy = random.choice([-2, 2])
+            self.reset_ball_game2(direction=-1)
 
         if self.ball_x > W:
             self.player_score += 1
-            self.ball_x = W // 2
-            self.ball_y = H // 2
-            self.ball_vx = -3
-            self.ball_vy = random.choice([-2, 2])
+            self.reset_ball_game2(direction=1)
 
-        if self.player_score >= 5:
+    def check_game2_over(self):
+        if self.player_score >= PONG_WINNING_SCORE:
             self.game2_over = True
             self.game2_winner = "YOU WIN!"
             self.state = "game_2_over"
-        elif self.enemy_score >= 5:
+        elif self.enemy_score >= PONG_WINNING_SCORE:
             self.game2_over = True
             self.game2_winner = "YOU LOSE!"
             self.state = "game_2_over"
@@ -848,6 +1089,201 @@ class App:
         if all(not e["alive"] for e in self.g4_enemies):
             self.state = "game_4_win"
 
+    # ───────── GAME 5 UPDATE (SOLITAIRE) ─────────
+    def update_game5(self):
+        if self.g5_win:
+            return
+
+        if pyxel.btnp(pyxel.KEY_R):
+            self.reset_game5()
+            return
+
+        if self.g5_check_win():
+            self.g5_win = True
+            self.state = "game_5_win"
+            return
+
+        if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
+            mx = pyxel.mouse_x
+            my = pyxel.mouse_y
+            self.g5_handle_click(mx, my)
+
+    def g5_handle_click(self, mx, my):
+        self.g5_message = ""
+
+        if self.g5_point_in_rect(mx, my, STOCK_X, STOCK_Y, CARD_W, CARD_H):
+            if self.g5_selected_cards is None:
+                self.g5_draw_from_stock()
+            else:
+                self.g5_clear_selection()
+            return
+
+        if self.g5_point_in_rect(mx, my, WASTE_X, WASTE_Y, CARD_W, CARD_H):
+            if self.g5_waste:
+                if self.g5_selected_cards is None:
+                    self.g5_select_waste()
+                else:
+                    self.g5_try_move_to_waste()
+            return
+
+        for i in range(4):
+            fx = FOUNDATION_X_START + i * PILE_SPACING_X
+            fy = FOUNDATION_Y
+            if self.g5_point_in_rect(mx, my, fx, fy, CARD_W, CARD_H):
+                if self.g5_selected_cards is None:
+                    self.g5_select_foundation(i)
+                else:
+                    self.g5_try_move_to_foundation(i)
+                return
+
+        for col in range(7):
+            result = self.g5_get_tableau_clicked(col, mx, my)
+            if result is not None:
+                clicked_index = result
+                if self.g5_selected_cards is None:
+                    self.g5_select_tableau(col, clicked_index)
+                else:
+                    self.g5_try_move_to_tableau(col)
+                return
+
+        for col in range(7):
+            tx = TABLEAU_X_START + col * PILE_SPACING_X
+            ty = TABLEAU_Y
+            empty_h = CARD_H if not self.g5_tableau[col] else CARD_H + (len(self.g5_tableau[col]) - 1) * TABLEAU_GAP_Y
+            if self.g5_point_in_rect(mx, my, tx, ty, CARD_W, empty_h):
+                if self.g5_selected_cards is not None:
+                    self.g5_try_move_to_tableau(col)
+                    return
+
+        self.g5_clear_selection()
+
+    def g5_draw_from_stock(self):
+        if self.g5_stock:
+            card = self.g5_stock.pop()
+            card.face_up = True
+            self.g5_waste.append(card)
+        else:
+            while self.g5_waste:
+                card = self.g5_waste.pop()
+                card.face_up = False
+                self.g5_stock.append(card)
+
+    def g5_select_waste(self):
+        if self.g5_waste:
+            self.g5_selected_cards = [self.g5_waste[-1]]
+            self.g5_selected_source = ("waste", None)
+
+    def g5_select_foundation(self, foundation_index):
+        pile = self.g5_foundations[foundation_index]
+        if pile:
+            self.g5_selected_cards = [pile[-1]]
+            self.g5_selected_source = ("foundation", foundation_index)
+
+    def g5_select_tableau(self, col, index):
+        pile = self.g5_tableau[col]
+        if index < 0 or index >= len(pile):
+            return
+        if not pile[index].face_up:
+            return
+        self.g5_selected_cards = pile[index:]
+        self.g5_selected_source = ("tableau", col, index)
+
+    def g5_try_move_to_foundation(self, foundation_index):
+        if self.g5_selected_cards is None:
+            return
+        if len(self.g5_selected_cards) != 1:
+            self.g5_message = "Only one card to foundation"
+            return
+        card = self.g5_selected_cards[0]
+        foundation = self.g5_foundations[foundation_index]
+        if self.g5_valid_foundation_move(card, foundation):
+            self.g5_remove_selected_from_source()
+            self.g5_foundations[foundation_index].append(card)
+            self.g5_after_tableau_move_cleanup()
+            self.g5_clear_selection()
+        else:
+            self.g5_message = "Invalid foundation move"
+
+    def g5_try_move_to_tableau(self, col):
+        if self.g5_selected_cards is None:
+            return
+        dest_pile = self.g5_tableau[col]
+        first_card = self.g5_selected_cards[0]
+        if self.g5_selected_source and self.g5_selected_source[0] == "tableau":
+            src_col = self.g5_selected_source[1]
+            if src_col == col:
+                self.g5_clear_selection()
+                return
+        if self.g5_valid_tableau_move(first_card, dest_pile):
+            moved_cards = self.g5_selected_cards[:]
+            self.g5_remove_selected_from_source()
+            self.g5_tableau[col].extend(moved_cards)
+            self.g5_after_tableau_move_cleanup()
+            self.g5_clear_selection()
+        else:
+            self.g5_message = "Invalid tableau move"
+
+    def g5_try_move_to_waste(self):
+        self.g5_message = "Cannot move onto waste"
+
+    def g5_remove_selected_from_source(self):
+        if self.g5_selected_source is None or self.g5_selected_cards is None:
+            return
+        source_type = self.g5_selected_source[0]
+        if source_type == "waste":
+            self.g5_waste.pop()
+        elif source_type == "foundation":
+            foundation_index = self.g5_selected_source[1]
+            self.g5_foundations[foundation_index].pop()
+        elif source_type == "tableau":
+            col = self.g5_selected_source[1]
+            index = self.g5_selected_source[2]
+            self.g5_tableau[col] = self.g5_tableau[col][:index]
+
+    def g5_after_tableau_move_cleanup(self):
+        if self.g5_selected_source and self.g5_selected_source[0] == "tableau":
+            src_col = self.g5_selected_source[1]
+            if self.g5_tableau[src_col]:
+                if not self.g5_tableau[src_col][-1].face_up:
+                    self.g5_tableau[src_col][-1].face_up = True
+
+    def g5_clear_selection(self):
+        self.g5_selected_cards = None
+        self.g5_selected_source = None
+
+    def g5_valid_foundation_move(self, card, foundation):
+        if not foundation:
+            return card.rank == 1
+        top = foundation[-1]
+        return card.suit == top.suit and card.rank == top.rank + 1
+
+    def g5_valid_tableau_move(self, card, dest_pile):
+        if not dest_pile:
+            return card.rank == 13
+        top = dest_pile[-1]
+        if not top.face_up:
+            return False
+        return (card.is_red() != top.is_red()) and (card.rank == top.rank - 1)
+
+    def g5_check_win(self):
+        return all(len(f) == 13 for f in self.g5_foundations)
+
+    def g5_get_tableau_clicked(self, col, mx, my):
+        pile = self.g5_tableau[col]
+        x = TABLEAU_X_START + col * PILE_SPACING_X
+        y = TABLEAU_Y
+        if not pile:
+            return None
+        for i in range(len(pile) - 1, -1, -1):
+            cy = y + i * TABLEAU_GAP_Y
+            h = CARD_H if i == len(pile) - 1 else TABLEAU_GAP_Y + 2
+            if self.g5_point_in_rect(mx, my, x, cy, CARD_W, h):
+                return i
+        return None
+
+    def g5_point_in_rect(self, px, py, x, y, w, h):
+        return x <= px < x + w and y <= py < y + h
+
     # ───────── DRAW ─────────
     def draw(self):
         pyxel.cls(0)
@@ -872,34 +1308,157 @@ class App:
             self.draw_game4_over()
         elif self.state == "game_4_win":
             self.draw_game4_win()
-        else:
-            self.draw_placeholder()
+        elif self.state == "game_5":
+            self.draw_game5()
+        elif self.state == "game_5_win":
+            self.draw_game5_win()
+
+    # ───────── MENU LAYOUT ─────────
+    def _menu_layout(self):
+        SCALE         = 4
+        CHAR_W        = 3 * SCALE + SCALE
+        TITLE         = "PYXEL PORT"
+        TITLE_W       = len(TITLE) * CHAR_W
+        TITLE_X       = (W - TITLE_W) // 2
+        TITLE_Y       = 8
+        TITLE_H       = 5 * SCALE
+        COIN_Y        = TITLE_Y + TITLE_H + 6
+
+        ROW_H         = 14
+        N_GAMES       = len(self.games)
+        BOX_PAD_Y     = 8
+        BOX_W         = 180
+        BOX_H         = BOX_PAD_Y * 2 + N_GAMES * ROW_H
+        BOX_X         = (W - BOX_W) // 2
+
+        HINT_Y        = H - 10
+        BOX_Y         = HINT_Y - 32 - BOX_H
+
+        FIRST_ENTRY_Y = BOX_Y + BOX_PAD_Y + 2
+
+        return dict(
+            SCALE=SCALE, CHAR_W=CHAR_W, TITLE=TITLE,
+            TITLE_X=TITLE_X, TITLE_Y=TITLE_Y,
+            COIN_Y=COIN_Y,
+            ROW_H=ROW_H, N_GAMES=N_GAMES,
+            BOX_X=BOX_X, BOX_Y=BOX_Y, BOX_W=BOX_W, BOX_H=BOX_H,
+            FIRST_ENTRY_Y=FIRST_ENTRY_Y,
+        )
+
+    # ───────── MENU UPDATE ─────────
+    def update_menu(self):
+        for star in self.stars:
+            star["y"] += star["speed"]
+            if star["y"] >= H:
+                star["y"] = 0
+                star["x"] = random.randint(0, W - 1)
+
+        L = self._menu_layout()
+        target_y = float(L["FIRST_ENTRY_Y"] + self.selected * L["ROW_H"])
+        self.menu_highlight_y += (target_y - self.menu_highlight_y) * 0.18
 
     # ───────── MENU DRAW ─────────
     def draw_menu(self):
-        for y in range(H):
-            pyxel.line(0, y, W, y, 1 if y < H // 2 else 0)
+        L = self._menu_layout()
+        SCALE         = L["SCALE"]
+        CHAR_W        = L["CHAR_W"]
+        TITLE         = L["TITLE"]
+        TITLE_X       = L["TITLE_X"]
+        TITLE_Y       = L["TITLE_Y"]
+        COIN_Y        = L["COIN_Y"]
+        ROW_H         = L["ROW_H"]
+        BOX_X         = L["BOX_X"]
+        BOX_Y         = L["BOX_Y"]
+        BOX_W         = L["BOX_W"]
+        BOX_H         = L["BOX_H"]
+        FIRST_ENTRY_Y = L["FIRST_ENTRY_Y"]
 
-        title = "PYXEL PORT"
-        scale = 4
-        start_x = (W - len(title) * (3 * scale + scale)) // 2
-        y = 40
+        preview = self.menu_preview_rects[self.selected]
+        for rx, ry, rw, rh, rc in preview:
+            pyxel.rect(rx, ry, rw, rh, rc)
 
-        for i, ch in enumerate(title):
-            self.draw_block_char(start_x + i * (3 * scale + scale), y, ch, scale, 8)
+        if self.selected == 0:
+            for (x, y) in [(62,80),(101,88),(157,111),(88,152),(210,140)]:
+                pyxel.line(x, y, x+4, y, 1)
+                pyxel.line(x+2, y-2, x+2, y+2, 1)
+        elif self.selected == 1:
+            # Tennis court preview
+            court_x = 16
+            court_y = 16
+            court_w = W - 32
+            court_h = H - 32
+            pyxel.rect(court_x, court_y, court_w, court_h, 12)
+            pyxel.line(court_x, court_y + 36, court_x + court_w, court_y + 36, 7)
+            pyxel.line(court_x, court_y + court_h - 36, court_x + court_w, court_y + court_h - 36, 7)
+            pyxel.line(court_x + 20, court_y, court_x + 20, court_y + court_h, 7)
+            pyxel.line(court_x + court_w - 20, court_y, court_x + court_w - 20, court_y + court_h, 7)
+            pyxel.line(W // 2, court_y, W // 2, court_y + court_h, 7)
+            pyxel.line(court_x, H // 2, court_x + court_w, H // 2, 7)
+        elif self.selected == 2:
+            for ci in range(4):
+                for cj in range(4):
+                    cx = 60 + cj * 45
+                    cy = 50 + ci * 35
+                    pyxel.rect(cx, cy, 36, 28, 2)
+                    pyxel.text(cx+11, cy+10, "R.A.M.", 1)
+        elif self.selected == 3:
+            for col in range(6):
+                ex = 40 + col * 38
+                for row in range(2):
+                    ey = 40 + row * 28
+                    pyxel.rect(ex+2, ey, 8, 3, 8)
+                    pyxel.rect(ex, ey+3, 12, 3, 8)
+                    pyxel.rect(ex+2, ey+6, 2, 2, 8)
+                    pyxel.rect(ex+8, ey+6, 2, 2, 8)
+            for i in range(0, 80, 7):
+                pyxel.pset(i*4 % W, (i*13+20) % H, 7)
+        elif self.selected == 4:
+            for col in range(7):
+                cx = 10 + col * 44
+                pyxel.rect(cx, 55, 20, 28, 7)
+                pyxel.rectb(cx, 55, 20, 28, 0)
+                pyxel.rect(cx, 83, 20, 14, 7)
+                pyxel.rectb(cx, 83, 20, 14, 0)
+                pyxel.rect(cx, 97, 20, 14, 7)
+                pyxel.rectb(cx, 97, 20, 14, 0)
+
+        for star in self.stars:
+            pyxel.pset(int(star["x"]), int(star["y"]), star["col"])
+
+        cycle_colors = [8, 9, 10, 11, 12, 14, 15, 7]
+        for i, ch in enumerate(TITLE):
+            color_index = (i + pyxel.frame_count // 6) % len(cycle_colors)
+            col = cycle_colors[color_index]
+            self.draw_block_char(TITLE_X + i * CHAR_W, TITLE_Y, ch, SCALE, col)
 
         if pyxel.frame_count % 40 < 20:
-            text = "INSERT COIN"
-            pyxel.text((W - len(text) * 4) // 2, 95, text, 10)
+            coin_text = "INSERT COIN"
+            pyxel.text((W - len(coin_text) * 4) // 2, COIN_Y, coin_text, 10)
 
-        pyxel.rect(80, 102, 160, 110, 0)
-        pyxel.rectb(80, 102, 160, 110, 7)
+        pyxel.rect(BOX_X, BOX_Y, BOX_W, BOX_H, 0)
+        pyxel.rectb(BOX_X, BOX_Y, BOX_W, BOX_H, 7)
+
+        hl_y = int(self.menu_highlight_y) - 2
+        pyxel.rect(BOX_X + 2, hl_y, BOX_W - 4, 12, 1)
+        pyxel.rectb(BOX_X + 2, hl_y, BOX_W - 4, 12, 10)
 
         for i, game in enumerate(self.games):
-            yy = 122 + i * 14
-            if i == self.selected:
-                pyxel.circ(95, yy + 3, 2, 10)
-            pyxel.text(110, yy, game, 7)
+            entry_y = FIRST_ENTRY_Y + i * ROW_H
+            text_w  = len(game) * 4
+            text_x  = BOX_X + (BOX_W - text_w) // 2
+            text_col = 10 if i == self.selected else 7
+            pyxel.text(text_x, entry_y, game, text_col)
+
+        if self.music_muted:
+            pyxel.text(W - 24, H - 20, "M:OFF", 8)
+        else:
+            if pyxel.frame_count % 30 < 15:
+                pyxel.text(W - 24, H - 20, "M:ON", 11)
+            else:
+                pyxel.text(W - 24, H - 20, "M:ON", 3)
+
+        hint = "UP/DOWN  ENTER select  M mute  ESC quit"
+        pyxel.text((W - len(hint) * 4) // 2, H - 10, hint, 5)
 
     # ───────── GAME 1 DRAW ─────────
     def draw_game1(self):
@@ -974,23 +1533,40 @@ class App:
         menu_text = "TAB FOR MENU"
         pyxel.text((W - len(menu_text) * 4) // 2, 155, menu_text, 6)
 
-    # ───────── GAME 2 DRAW ─────────
+    # ───────── GAME 2 DRAW (PONG) ─────────
     def draw_game2(self):
-        pyxel.cls(0)
+        # Tennis court background
+        pyxel.cls(3)
+        court_x = 16
+        court_y = 16
+        court_w = W - 32
+        court_h = H - 32
+        pyxel.rect(court_x, court_y, court_w, court_h, 12)
+        pyxel.line(court_x, court_y + 36, court_x + court_w, court_y + 36, 7)
+        pyxel.line(court_x, court_y + court_h - 36, court_x + court_w, court_y + court_h - 36, 7)
+        pyxel.line(court_x + 20, court_y, court_x + 20, court_y + court_h, 7)
+        pyxel.line(court_x + court_w - 20, court_y, court_x + court_w - 20, court_y + court_h, 7)
+        pyxel.line(W // 2, court_y, W // 2, court_y + court_h, 7)
+        pyxel.line(court_x, H // 2, court_x + court_w, H // 2, 7)
 
-        for y in range(0, H, 10):
-            pyxel.line(W // 2, y, W // 2, y + 5, 5)
+        # Player paddle (green)
+        pyxel.rect(10, self.paddle_y, 5, PONG_PADDLE_HEIGHT, 11)
+        # Enemy paddle (red)
+        pyxel.rect(W - 15, self.enemy_y, 5, PONG_PADDLE_HEIGHT, 8)
+        # Ball (yellow)
+        pyxel.circ(int(self.ball_x), int(self.ball_y), 3, 10)
 
-        pyxel.rect(10, self.paddle_y, 5, 40, 7)
-        pyxel.rect(W - 15, self.enemy_y, 5, 40, 7)
-        pyxel.circ(self.ball_x, self.ball_y, 3, 7)
-
-        pyxel.text(70, 10, str(self.player_score), 7)
-        pyxel.text(W - 80, 10, str(self.enemy_score), 7)
+        pyxel.text(70, 5, str(self.player_score), 7)
+        pyxel.text(W - 80, 5, str(self.enemy_score), 7)
         pyxel.text(8, H - 10, "UP/DOWN move  TAB menu", 7)
 
     def draw_game2_over(self):
-        pyxel.cls(0)
+        pyxel.cls(3)
+        court_x = 16
+        court_y = 16
+        court_w = W - 32
+        court_h = H - 32
+        pyxel.rect(court_x, court_y, court_w, court_h, 12)
 
         pyxel.rect(70, 75, 180, 90, 0)
         pyxel.rectb(70, 75, 180, 90, 7)
@@ -1065,6 +1641,99 @@ class App:
         menu_text = "TAB FOR MENU"
         pyxel.text((W - len(menu_text) * 4) // 2, 152, menu_text, 6)
 
+    # ───────── GAME 5 DRAW (SOLITAIRE) ─────────
+    def draw_game5(self):
+        pyxel.cls(3)
+
+        pyxel.text(10, 2, "STOCK", 7)
+        pyxel.text(40, 2, "WASTE", 7)
+        pyxel.text(180, 2, "FOUNDATIONS", 7)
+
+        if self.g5_stock:
+            pyxel.rect(STOCK_X, STOCK_Y, CARD_W, CARD_H, 5)
+            pyxel.rectb(STOCK_X, STOCK_Y, CARD_W, CARD_H, 0)
+            pyxel.text(STOCK_X + 3, STOCK_Y + 10, "[]", 1)
+        else:
+            self.g5_draw_empty_slot(STOCK_X, STOCK_Y)
+
+        if self.g5_waste:
+            selected = self.g5_selected_source == ("waste", None)
+            self.g5_draw_card(WASTE_X, WASTE_Y, self.g5_waste[-1], selected)
+        else:
+            self.g5_draw_empty_slot(WASTE_X, WASTE_Y)
+
+        for i in range(4):
+            x = FOUNDATION_X_START + i * PILE_SPACING_X
+            y = FOUNDATION_Y
+            pile = self.g5_foundations[i]
+            if pile:
+                selected = self.g5_selected_source == ("foundation", i)
+                self.g5_draw_card(x, y, pile[-1], selected)
+            else:
+                self.g5_draw_empty_slot(x, y)
+
+        for col in range(7):
+            x = TABLEAU_X_START + col * PILE_SPACING_X
+            y = TABLEAU_Y
+            pile = self.g5_tableau[col]
+
+            if not pile:
+                self.g5_draw_empty_slot(x, y)
+                continue
+
+            for i, card in enumerate(pile):
+                cy = y + i * TABLEAU_GAP_Y
+
+                selected = False
+                if self.g5_selected_source and self.g5_selected_source[0] == "tableau":
+                    src_col = self.g5_selected_source[1]
+                    src_index = self.g5_selected_source[2]
+                    if src_col == col and i >= src_index:
+                        selected = True
+
+                self.g5_draw_card(x, cy, card, selected)
+
+        pyxel.text(10, H - 18, "Click cards to select/move  R=restart  TAB=menu", 7)
+
+        if self.g5_message:
+            pyxel.text(10, H - 9, self.g5_message, 8)
+
+    def draw_game5_win(self):
+        pyxel.cls(3)
+
+        pyxel.rect(70, 90, 180, 60, 0)
+        pyxel.rectb(70, 90, 180, 60, 10)
+
+        title = "YOU WIN!"
+        pyxel.text((W - len(title) * 4) // 2, 105, title, 11)
+
+        retry_text = "PRESS ENTER TO PLAY AGAIN"
+        pyxel.text((W - len(retry_text) * 4) // 2, 122, retry_text, 10)
+
+        menu_text = "TAB FOR MENU"
+        pyxel.text((W - len(menu_text) * 4) // 2, 136, menu_text, 6)
+
+    def g5_draw_card(self, x, y, card, selected=False):
+        if card.face_up:
+            pyxel.rect(x, y, CARD_W, CARD_H, 7)
+            border = 10 if selected else 0
+            pyxel.rectb(x, y, CARD_W, CARD_H, border)
+            rank = rank_to_text(card.rank)
+            suit = suit_symbol(card.suit)
+            color = 8 if card.is_red() else 0
+            pyxel.text(x + 2, y + 2, rank, color)
+            pyxel.text(x + 2, y + 10, suit, color)
+            pyxel.text(x + CARD_W - 10, y + CARD_H - 10, rank, color)
+            pyxel.text(x + CARD_W - 10, y + CARD_H - 18, suit, color)
+        else:
+            pyxel.rect(x, y, CARD_W, CARD_H, 5)
+            pyxel.rectb(x, y, CARD_W, CARD_H, 0)
+            pyxel.text(x + 5, y + 10, "[]", 1)
+
+    def g5_draw_empty_slot(self, x, y):
+        pyxel.rectb(x, y, CARD_W, CARD_H, 6)
+
+    # ───────── SHARED DRAW HELPERS ─────────
     def draw_invader(self, x, y):
         pyxel.rect(x + 2, y, 8, 3, 8)
         pyxel.rect(x, y + 3, 12, 3, 8)
@@ -1219,19 +1888,6 @@ class App:
             for col_i, bit in enumerate(line):
                 if bit == "1":
                     pyxel.rect(x + col_i * s, y + row * s, s, s, col)
-
-    def draw_placeholder(self):
-        pyxel.cls(0)
-
-        game_index = int(self.state.split("_")[1])
-        game_name = self.games[game_index - 1]
-
-        msg = f"INSERT {game_name} HERE"
-        pyxel.text((W - len(msg) * 4) // 2, H // 2, msg, 7)
-
-        pyxel.text(5, H - 10, "TAB to return", 5)
-        esc_text = "ESC to exit"
-        pyxel.text(W - len(esc_text) * 4 - 5, H - 10, esc_text, 5)
 
 
 App()
