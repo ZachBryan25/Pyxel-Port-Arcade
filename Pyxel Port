@@ -17,6 +17,14 @@ FOUNDATION_X_START, FOUNDATION_Y = 180, 10
 TABLEAU_X_START, TABLEAU_Y = 10, 60
 PILE_SPACING_X = 30
 
+# ───────── PONG CONSTANTS ─────────
+PONG_PADDLE_HEIGHT = 40
+PONG_BALL_START_SPEED = 3
+PONG_WINNING_SCORE = 5
+PONG_PLAYER_SPEED = 4
+PONG_HIT_SPEED_INCREASE = 1.08
+PONG_MAX_SPEED = 9
+
 
 # ───────── SOLITAIRE CARD CLASS ─────────
 class Card:
@@ -284,10 +292,6 @@ class RandomAccessMatch:
 
 # ───────── MUSIC SETUP ─────────
 def setup_menu_music():
-    
-
-    # ── MELODY PHRASE A ──────────────────────────────────────────────────
-    
     pyxel.sound(2).set(
         notes ="c3 e3 g3 e3 c3 e3 g3 b3 a3 g3 e3 c3 e3 g3 a3 r",
         tones ="s  s  s  s  s  s  s  s  s  s  s  s  s  s  s  s",
@@ -296,8 +300,6 @@ def setup_menu_music():
         speed =7
     )
 
-    # ── MELODY PHRASE B ──────────────────────────────────────────────────
-   
     pyxel.sound(3).set(
         notes ="g3 a3 g3 e3 f3 e3 d3 c3 e3 g3 c3 r  c3 e3 g3 r",
         tones ="s  s  s  s  s  s  s  s  s  s  s  s  s  s  s  s",
@@ -306,8 +308,6 @@ def setup_menu_music():
         speed =7
     )
 
-    # ── BASS PHRASE A ────────────────────────────────────────────────────
-    
     pyxel.sound(10).set(
         notes ="c2 c2 c2 c2 c2 c2 g2 g2 a1 a1 c2 c2 c2 c2 g2 g2",
         tones ="t  t  t  t  t  t  t  t  t  t  t  t  t  t  t  t",
@@ -316,8 +316,6 @@ def setup_menu_music():
         speed =7
     )
 
-    # ── BASS PHRASE B ────────────────────────────────────────────────────
-   
     pyxel.sound(11).set(
         notes ="g1 g1 g1 g1 f1 f1 f1 f1 c2 c2 c2 c2 c2 c2 c2 c2",
         tones ="t  t  t  t  t  t  t  t  t  t  t  t  t  t  t  t",
@@ -326,7 +324,6 @@ def setup_menu_music():
         speed =7
     )
 
-    # ── KICK — beats 1 & 3 ───────────────────────────────────────────────
     pyxel.sound(14).set(
         notes ="a0 r  r  r  a0 r  r  r  a0 r  r  r  a0 r  r  r",
         tones ="n  n  n  n  n  n  n  n  n  n  n  n  n  n  n  n",
@@ -335,7 +332,6 @@ def setup_menu_music():
         speed =7
     )
 
-    # ── HI-HAT — every half-beat ─────────────────────────────────────────
     pyxel.sound(15).set(
         notes ="a0 r  a0 r  a0 r  a0 r  a0 r  a0 r  a0 r  a0 r",
         tones ="n  n  n  n  n  n  n  n  n  n  n  n  n  n  n  n",
@@ -344,12 +340,11 @@ def setup_menu_music():
         speed =7
     )
 
-    # ── MUSIC TRACK 0 ────────────────────────────────────────────────────
     pyxel.music(0).set(
-        [],       # ch0 melody:  (empty)
-        [10, 11, 10, 11],   # ch1 bass:    A B A B loop
-        [14, 14, 14, 14],   # ch2 kick
-        [15, 15, 15, 15],   # ch3 hi-hat
+        [],
+        [10, 11, 10, 11],
+        [14, 14, 14, 14],
+        [15, 15, 15, 15],
     )
 
 
@@ -358,16 +353,14 @@ class App:
         pyxel.init(W, H, title="Pyxel Port", fps=60)
         pyxel.mouse(True)
 
-        # ── SFX (slots 0, 1 — used by RAM match) ──
         pyxel.sound(0).set("c3e3g3", "p", "7", "s", 5)
         pyxel.sound(1).set("c2", "p", "6", "s", 10)
 
-        # ── Menu music (slots 2-15) ──
         setup_menu_music()
 
         self.state = "menu"
-        self.music_playing = False   # track whether menu music is active
-        self.music_muted = False     # toggled by M key
+        self.music_playing = False
+        self.music_muted = False
 
         self.games = [
             "Dungeon Shooter",
@@ -379,8 +372,6 @@ class App:
 
         self.selected = 0
 
-        # ── MENU EFFECTS ──
-        # Starfield
         rng = random.Random(42)
         self.stars = [
             {
@@ -392,26 +383,19 @@ class App:
             for _ in range(80)
         ]
 
-        # Floating highlight — snapped to correct position on first update_menu call
         self.menu_highlight_y = float(139)
         self.menu_highlight_target_y = float(139)
 
-        # Preview bg palette per game index
         self.menu_preview_rects = [
-            # 0 Dungeon Shooter – dark stone room
             [
                 (0, 0, W, H, 5),
                 (30, 30, W-60, H-60, 4),
                 (0, 0, W, 28, 1), (0, H-28, W, 28, 1),
                 (0, 28, 28, H-56, 1), (W-28, 28, 28, H-56, 1),
             ],
-            # 1 Pong – black with center dashes
             [(0, 0, W, H, 0)],
-            # 2 RAM Match – dark teal
             [(0, 0, W, H, 0), (50, 40, 220, 160, 2)],
-            # 3 Space Invaders – deep space
             [(0, 0, W, H, 0), (0, 0, W, 3, 1)],
-            # 4 Solitaire – green felt
             [(0, 0, W, H, 3)],
         ]
 
@@ -474,16 +458,26 @@ class App:
 
     # ───────── RESET GAME 2 (PONG) ─────────
     def reset_game2(self):
-        self.paddle_y = H // 2 - 20
-        self.enemy_y = H // 2 - 20
-        self.ball_x = W // 2
-        self.ball_y = H // 2
-        self.ball_vx = 3
-        self.ball_vy = 2
+        self.paddle_y = H // 2 - PONG_PADDLE_HEIGHT // 2
+        self.enemy_y = H // 2 - PONG_PADDLE_HEIGHT // 2
+        self.ball_x = float(W // 2)
+        self.ball_y = float(H // 2)
+        self.ball_vx = float(PONG_BALL_START_SPEED)
+        self.ball_vy = float(PONG_BALL_START_SPEED)
         self.player_score = 0
         self.enemy_score = 0
         self.game2_over = False
         self.game2_winner = ""
+
+    def reset_ball_game2(self, direction):
+        self.ball_x = float(W // 2)
+        self.ball_y = float(H // 2)
+        self.ball_vx = float(PONG_BALL_START_SPEED * direction)
+        self.ball_vy = float(PONG_BALL_START_SPEED)
+
+    def increase_ball_speed_game2(self):
+        self.ball_vx = max(min(self.ball_vx * PONG_HIT_SPEED_INCREASE, PONG_MAX_SPEED), -PONG_MAX_SPEED)
+        self.ball_vy = max(min(self.ball_vy * PONG_HIT_SPEED_INCREASE, PONG_MAX_SPEED), -PONG_MAX_SPEED)
 
     # ───────── RESET GAME 4 (SPACE INVADERS) ─────────
     def reset_game4(self):
@@ -652,7 +646,6 @@ class App:
             if pyxel.btnp(pyxel.KEY_TAB):
                 self.state = "menu"
 
-        # Resume music when returning to menu from any game
         if self.state == "menu" and not self.music_playing:
             self.start_menu_music()
 
@@ -914,59 +907,75 @@ class App:
         if self.game2_over:
             return
 
+        self.update_game2_player()
+        self.update_game2_enemy()
+        self.update_game2_ball()
+        self.check_game2_score()
+        self.check_game2_over()
+
+    def update_game2_player(self):
         if pyxel.btn(pyxel.KEY_UP):
-            self.paddle_y -= 4
+            self.paddle_y -= PONG_PLAYER_SPEED
         if pyxel.btn(pyxel.KEY_DOWN):
-            self.paddle_y += 4
+            self.paddle_y += PONG_PLAYER_SPEED
+        self.paddle_y = max(0, min(H - PONG_PADDLE_HEIGHT, self.paddle_y))
 
-        self.paddle_y = max(0, min(H - 40, self.paddle_y))
+    def update_game2_enemy(self):
+        enemy_speed = 4.8
 
-        if self.ball_y > self.enemy_y + 20:
-            self.enemy_y += 3
-        elif self.ball_y < self.enemy_y + 20:
-            self.enemy_y -= 3
+        # slight delay every 5 frames
+        if pyxel.frame_count % 5 == 0:
+            return
 
-        self.enemy_y = max(0, min(H - 40, self.enemy_y))
+        target_y = self.ball_y - PONG_PADDLE_HEIGHT // 2
 
+        # occasional mistake
+        if pyxel.frame_count % 90 < 15:
+            target_y += 10
+
+        if target_y > self.enemy_y:
+            self.enemy_y += enemy_speed
+        elif target_y < self.enemy_y:
+            self.enemy_y -= enemy_speed
+
+        self.enemy_y = max(0, min(H - PONG_PADDLE_HEIGHT, self.enemy_y))
+
+    def update_game2_ball(self):
         self.ball_x += self.ball_vx
         self.ball_y += self.ball_vy
 
-        if self.ball_y <= 3 or self.ball_y >= H - 3:
+        if self.ball_y <= 0 or self.ball_y >= H:
             self.ball_vy *= -1
 
-        if (
-            self.ball_x <= 15
-            and self.paddle_y <= self.ball_y <= self.paddle_y + 40
-            and self.ball_vx < 0
-        ):
-            self.ball_vx *= -1
+        # player paddle hit
+        if (self.ball_x <= 15 and
+                self.paddle_y <= self.ball_y <= self.paddle_y + PONG_PADDLE_HEIGHT and
+                self.ball_vx < 0):
+            self.ball_vx = abs(self.ball_vx)
+            self.increase_ball_speed_game2()
 
-        if (
-            self.ball_x >= W - 15
-            and self.enemy_y <= self.ball_y <= self.enemy_y + 40
-            and self.ball_vx > 0
-        ):
-            self.ball_vx *= -1
+        # enemy paddle hit
+        if (self.ball_x >= W - 15 and
+                self.enemy_y <= self.ball_y <= self.enemy_y + PONG_PADDLE_HEIGHT and
+                self.ball_vx > 0):
+            self.ball_vx = -abs(self.ball_vx)
+            self.increase_ball_speed_game2()
 
+    def check_game2_score(self):
         if self.ball_x < 0:
             self.enemy_score += 1
-            self.ball_x = W // 2
-            self.ball_y = H // 2
-            self.ball_vx = 3
-            self.ball_vy = random.choice([-2, 2])
+            self.reset_ball_game2(direction=-1)
 
         if self.ball_x > W:
             self.player_score += 1
-            self.ball_x = W // 2
-            self.ball_y = H // 2
-            self.ball_vx = -3
-            self.ball_vy = random.choice([-2, 2])
+            self.reset_ball_game2(direction=1)
 
-        if self.player_score >= 5:
+    def check_game2_over(self):
+        if self.player_score >= PONG_WINNING_SCORE:
             self.game2_over = True
             self.game2_winner = "YOU WIN!"
             self.state = "game_2_over"
-        elif self.enemy_score >= 5:
+        elif self.enemy_score >= PONG_WINNING_SCORE:
             self.game2_over = True
             self.game2_winner = "YOU LOSE!"
             self.state = "game_2_over"
@@ -1304,7 +1313,7 @@ class App:
         elif self.state == "game_5_win":
             self.draw_game5_win()
 
-    # ───────── MENU LAYOUT (single source of truth) ─────────
+    # ───────── MENU LAYOUT ─────────
     def _menu_layout(self):
         SCALE         = 4
         CHAR_W        = 3 * SCALE + SCALE
@@ -1373,10 +1382,18 @@ class App:
                 pyxel.line(x, y, x+4, y, 1)
                 pyxel.line(x+2, y-2, x+2, y+2, 1)
         elif self.selected == 1:
-            for dash_y in range(0, H, 10):
-                pyxel.line(W//2, dash_y, W//2, dash_y+5, 5)
-            pyxel.rect(10, H//2-20, 5, 40, 7)
-            pyxel.rect(W-15, H//2-20, 5, 40, 7)
+            # Tennis court preview
+            court_x = 16
+            court_y = 16
+            court_w = W - 32
+            court_h = H - 32
+            pyxel.rect(court_x, court_y, court_w, court_h, 12)
+            pyxel.line(court_x, court_y + 36, court_x + court_w, court_y + 36, 7)
+            pyxel.line(court_x, court_y + court_h - 36, court_x + court_w, court_y + court_h - 36, 7)
+            pyxel.line(court_x + 20, court_y, court_x + 20, court_y + court_h, 7)
+            pyxel.line(court_x + court_w - 20, court_y, court_x + court_w - 20, court_y + court_h, 7)
+            pyxel.line(W // 2, court_y, W // 2, court_y + court_h, 7)
+            pyxel.line(court_x, H // 2, court_x + court_w, H // 2, 7)
         elif self.selected == 2:
             for ci in range(4):
                 for cj in range(4):
@@ -1432,7 +1449,6 @@ class App:
             text_col = 10 if i == self.selected else 7
             pyxel.text(text_x, entry_y, game, text_col)
 
-        # Music status indicator — shows ♪ when playing, ♪X when muted
         if self.music_muted:
             pyxel.text(W - 24, H - 20, "M:OFF", 8)
         else:
@@ -1517,23 +1533,40 @@ class App:
         menu_text = "TAB FOR MENU"
         pyxel.text((W - len(menu_text) * 4) // 2, 155, menu_text, 6)
 
-    # ───────── GAME 2 DRAW ─────────
+    # ───────── GAME 2 DRAW (PONG) ─────────
     def draw_game2(self):
-        pyxel.cls(0)
+        # Tennis court background
+        pyxel.cls(3)
+        court_x = 16
+        court_y = 16
+        court_w = W - 32
+        court_h = H - 32
+        pyxel.rect(court_x, court_y, court_w, court_h, 12)
+        pyxel.line(court_x, court_y + 36, court_x + court_w, court_y + 36, 7)
+        pyxel.line(court_x, court_y + court_h - 36, court_x + court_w, court_y + court_h - 36, 7)
+        pyxel.line(court_x + 20, court_y, court_x + 20, court_y + court_h, 7)
+        pyxel.line(court_x + court_w - 20, court_y, court_x + court_w - 20, court_y + court_h, 7)
+        pyxel.line(W // 2, court_y, W // 2, court_y + court_h, 7)
+        pyxel.line(court_x, H // 2, court_x + court_w, H // 2, 7)
 
-        for y in range(0, H, 10):
-            pyxel.line(W // 2, y, W // 2, y + 5, 5)
+        # Player paddle (green)
+        pyxel.rect(10, self.paddle_y, 5, PONG_PADDLE_HEIGHT, 11)
+        # Enemy paddle (red)
+        pyxel.rect(W - 15, self.enemy_y, 5, PONG_PADDLE_HEIGHT, 8)
+        # Ball (yellow)
+        pyxel.circ(int(self.ball_x), int(self.ball_y), 3, 10)
 
-        pyxel.rect(10, self.paddle_y, 5, 40, 7)
-        pyxel.rect(W - 15, self.enemy_y, 5, 40, 7)
-        pyxel.circ(self.ball_x, self.ball_y, 3, 7)
-
-        pyxel.text(70, 10, str(self.player_score), 7)
-        pyxel.text(W - 80, 10, str(self.enemy_score), 7)
+        pyxel.text(70, 5, str(self.player_score), 7)
+        pyxel.text(W - 80, 5, str(self.enemy_score), 7)
         pyxel.text(8, H - 10, "UP/DOWN move  TAB menu", 7)
 
     def draw_game2_over(self):
-        pyxel.cls(0)
+        pyxel.cls(3)
+        court_x = 16
+        court_y = 16
+        court_w = W - 32
+        court_h = H - 32
+        pyxel.rect(court_x, court_y, court_w, court_h, 12)
 
         pyxel.rect(70, 75, 180, 90, 0)
         pyxel.rectb(70, 75, 180, 90, 7)
